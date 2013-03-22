@@ -643,11 +643,10 @@ static VAStatus tng__get_encoder_caps(context_ENC_p ctx)
 
     ctx->ui32CoreRev = tng__get_core_rev();
     psCaps->ui32CoreFeatures = tng__get_core_des1();
-    
+
     /* get the actual number of cores */
     ui32NumCores = tng__get_num_pipes();
-    ctx->ui8PipesToUse = (IMG_UINT8)(ui32NumCores & 0xff);
-        
+
     switch (ctx->eStandard) {
         case IMG_STANDARD_JPEG:
             psCaps->ui16MaxSlices = ui16Height / 8;
@@ -697,6 +696,7 @@ static VAStatus tng__init_context(context_ENC_p ctx)
     //ctx->ui32HWProfile = pParams->ui32HWProfile;
     ctx->ui32FrameCount[0] = ctx->ui32FrameCount[1] = 0;
     /* Using Extended parameters */
+    ctx->ui8PipesToUse = (IMG_UINT8)(tng__get_num_pipes() & (IMG_UINT32)0xff);
     //carc params
     ctx->sCARCParams.bCARC             = 0;
     ctx->sCARCParams.i32CARCBaseline   = 0;
@@ -756,7 +756,6 @@ static VAStatus tng__init_context(context_ENC_p ctx)
     ctx->bNoOffscreenMv = (ctx->eStandard == IMG_STANDARD_H263) ? IMG_TRUE : IMG_FALSE; //Default Value ?? Extended Parameter and bUseOffScreenMVUserSetting
     ctx->bNoSequenceHeaders = IMG_FALSE;
     ctx->bTopFieldFirst = IMG_TRUE;
-    ctx->bOutputReconstructed = IMG_FALSE;
     ctx->sBiasTables.ui32FCode = ctx->ui32FCode;
     ctx->ui32pseudo_rand_seed = UNINIT_PARAM;
     ctx->bVPAdaptiveRoundingDisable = IMG_TRUE;
@@ -880,7 +879,8 @@ static VAStatus tng__provide_buffer_BFrames(context_ENC_p ctx, IMG_UINT32 ui32St
     FRAME_ORDER_INFO *psFrameInfo = &(ctx->sFrameOrderInfo);
     int slot_index = 0;
     unsigned long long display_order = 0;
-    IMG_UINT32 ui32SlotBuf = psRCParams->ui16BFrames + 2;
+    IMG_INT32  i32SlotBuf  = (IMG_INT32)(psRCParams->ui16BFrames + 2);
+    IMG_UINT32 ui32SlotBuf = (IMG_UINT32)(psRCParams->ui16BFrames + 2);
     IMG_UINT32 ui32FrameIdx = ctx->ui32FrameCount[ui32StreamIndex];
 
     if (ui32StreamIndex == 0)
@@ -905,7 +905,7 @@ static VAStatus tng__provide_buffer_BFrames(context_ENC_p ctx, IMG_UINT32 ui32St
             do {
                 tng_send_source_frame(ctx, slot_index, slot_index);
                 ++slot_index;
-            } while(slot_index < ui32SlotBuf);
+            } while(slot_index < i32SlotBuf);
         } else {
             slot_index = ui32FrameIdx - 1;
             tng_send_source_frame(ctx, slot_index, slot_index);
@@ -2629,7 +2629,7 @@ static void tng__setvideo_params(context_ENC_p ctx, IMG_UINT32 ui32StreamIndex)
     psMtxEncContext->eStandard = ctx->eStandard;
     psMtxEncContext->ui32WidthInMbs = ctx->ui16Width >> 4;
     psMtxEncContext->ui32PictureHeightInMbs = ctx->ui16PictureHeight >> 4;
-    psMtxEncContext->bOutputReconstructed = ctx->bOutputReconstructed;
+    psMtxEncContext->bOutputReconstructed = (ps_buf->rec_surface != NULL) ? IMG_TRUE : IMG_FALSE;
     psMtxEncContext->ui32VopTimeResolution = ctx->ui32VopTimeResolution;
     psMtxEncContext->ui8MaxSlicesPerPicture = ctx->ui8SlicesPerPicture;
     psMtxEncContext->ui8NumPipes = ctx->ui8PipesToUse;
@@ -3058,7 +3058,11 @@ static void tng__setvideo_cmdbuf(context_ENC_p ctx, IMG_UINT32 ui32StreamIndex)
 {
     context_ENC_mem *ps_mem = &(ctx->ctx_mem[ui32StreamIndex]);
     context_ENC_mem_size *ps_mem_size = &(ctx->ctx_mem_size);
+#ifndef _TNG_FRAMES_
+    context_ENC_frame_buf *ps_buf = &(ctx->ctx_frame_buf);
+#endif
     IMG_MTX_VIDEO_CONTEXT* psMtxEncContext = NULL;
+    IMG_INT32 i;
 
     psb_buffer_map(&(ps_mem->bufs_mtx_context), &(ps_mem->bufs_mtx_context.virtual_addr));
     if (ps_mem->bufs_mtx_context.virtual_addr == NULL) {
@@ -3074,9 +3078,20 @@ static void tng__setvideo_cmdbuf(context_ENC_p ctx, IMG_UINT32 ui32StreamIndex)
     if (ctx->sRCParams.b16Hierarchical)
         tng_cmdbuf_set_phys(&psMtxEncContext->ui32MVSettingsHierarchical, 0, 
             &(ps_mem->bufs_mv_setting_hierar), 0, 0);
-
+#ifdef _TNG_FRAMES_
     tng_cmdbuf_set_phys(psMtxEncContext->apReconstructured, ctx->i32PicNodes,
         &(ps_mem->bufs_recon_pictures), 0, ps_mem_size->recon_pictures);
+#else
+    for (i = 0; i < ctx->i32PicNodes; i++) {
+        tng_cmdbuf_set_phys(&(psMtxEncContext->apReconstructured[i]), 0,
+            &(ps_buf->ref_surface[i]->psb_surface->buf), 0, 0);
+    }
+#endif
+    for (i = 0; i < ctx->i32PicNodes; i++) {
+        drv_debug_msg(VIDEO_DEBUG_GENERAL, "%s psMtxEncContext->apReconstructured[i]\n",
+            __FUNCTION__, psMtxEncContext->apReconstructured[i]);
+    }
+
 
     tng_cmdbuf_set_phys(psMtxEncContext->apColocated, ctx->i32PicNodes,
         &(ps_mem->bufs_colocated), 0, ps_mem_size->colocated);
