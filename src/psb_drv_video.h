@@ -33,18 +33,19 @@
 
 #include <va/va_backend.h>
 #include <va/va.h>
-#ifdef PSBVIDEO_MRFL_VPP
+
 #include <va/va_vpp.h>
-#endif
-#ifdef PSBVIDEO_MFLD
-#include <va/va_vpp.h>
-#endif
+
 #include "object_heap.h"
 #include "psb_def.h"
 //#include "psb_drv_debug.h"
 #include "xf86drm.h"
 #ifdef ANDROID
+#ifdef BAYTRAIL
+#include <linux/vxd_drm.h>
+#else
 #include <linux/psb_drm.h>
+#endif
 #endif
 #include "psb_overlay.h"
 #include "psb_texture.h"
@@ -329,6 +330,7 @@ struct psb_driver_data_s {
 #define IS_MFLD(driver_data) (((driver_data->dev_id & 0xFFFC) == 0x0130) || ((driver_data->dev_id & 0xFFFF) == 0x08C0) || ((driver_data->dev_id & 0xFFFF) == 0x08C7) || ((driver_data->dev_id & 0xFFFF) == 0x01FF) || ((driver_data->dev_id & 0xFFFF) == 0x08C8))
 #define IS_MRFL(driver_data) ((driver_data->dev_id & 0xFFFC) == 0x1180)
 #define IS_LEXINGTON(driver_data) ((driver_data->dev_id & 0xFFFF) == 0x01FF)
+#define IS_BAYTRAIL(driver_data) ((driver_data->dev_id & 0xFFFF) == 0x0F31)
 #endif
 
 struct object_config_s {
@@ -498,7 +500,7 @@ struct object_surface_s {
 	(((aux_info)>>PSB_CODEDBUF_##flag##_SHIFT) & PSB_CODEDBUF_##flag##_MASK)
 
 
-#define PSB_CODEDBUF_SEGMENT_MAX  (8)
+#define PSB_CODEDBUF_SEGMENT_MAX  (9)
 
 struct object_buffer_s {
     struct object_base_s base;
