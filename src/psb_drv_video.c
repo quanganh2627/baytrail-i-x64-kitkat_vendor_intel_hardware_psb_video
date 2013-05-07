@@ -2451,7 +2451,6 @@ static void psb__deinitDRM(VADriverContextP ctx)
     if (wsbmIsInitialized())
         wsbmTakedown();
 
-    close(driver_data->drm_fd);
     driver_data->drm_fd = -1;
 }
 
@@ -2512,8 +2511,11 @@ static VAStatus psb__initTTM(VADriverContextP ctx)
     ret = drmCommandWriteRead(driver_data->drm_fd, DRM_PSB_EXTENSION,
                               &arg, sizeof(arg));
     if (ret != 0 || !arg.rep.exists) {
-        drv_debug_msg(VIDEO_DEBUG_ERROR, "failed to detect DRM extension \"%s\".\n",
-                           drm_ext);
+        drv_debug_msg(VIDEO_DEBUG_ERROR, "failed to detect DRM extension \"%s\", fd=%d\n",
+                      drm_ext, driver_data->drm_fd);
+        drv_debug_msg(VIDEO_DEBUG_ERROR, "found error %s (ret=%d), arg.rep.exists=%d",
+                      strerror(errno), ret, arg.rep.exists);
+
         driver_data->main_pool = NULL;
         return VA_STATUS_ERROR_UNKNOWN;
     } else {
