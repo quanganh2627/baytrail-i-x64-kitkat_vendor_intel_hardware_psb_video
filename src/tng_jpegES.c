@@ -87,7 +87,7 @@ static void tng__trace_cmdbuf(tng_cmdbuf_p cmdbuf)
 #define SURFACE(id)    ((object_surface_p) object_heap_lookup( &ctx->obj_context->driver_data->surface_heap, id ))
 #define BUFFER(id)  ((object_buffer_p) object_heap_lookup( &ctx->obj_context->driver_data->buffer_heap, id ))
 
-#define PTG_JPEG_MAX_MCU_PER_SCAN (0x3D09)
+#define PTG_JPEG_MAX_MCU_PER_SCAN (0x4000)
 #define PTG_JPEG_HEADER_MAX_SIZE (1024)
 
 
@@ -510,7 +510,11 @@ static IMG_ERRORCODE SetMTXSetup(
 
     switch (pJPEGContext->eFormat) {
     case IMG_CODEC_PL12:
-    default:
+        if (pTFrame->psb_surface->stride % 64) {
+            drv_debug_msg(VIDEO_DEBUG_ERROR, "Surface stride isn't aligned to 64 bytes as HW requires: %u!\n",
+                          pTFrame->psb_surface->stride);
+            return IMG_ERR_INVALID_CONTEXT;
+        }
         pJPEGContext->pMTXSetup->ComponentPlane[0].ui32Stride = pTFrame->psb_surface->stride;
         pJPEGContext->pMTXSetup->ComponentPlane[1].ui32Stride = pTFrame->psb_surface->stride;
         pJPEGContext->pMTXSetup->ComponentPlane[2].ui32Stride = pTFrame->psb_surface->stride;
@@ -519,10 +523,14 @@ static IMG_ERRORCODE SetMTXSetup(
         pJPEGContext->pMTXSetup->ComponentPlane[1].ui32Height = pJPEGContext->MCUComponent[0].ui32YLimit / 2;
         pJPEGContext->pMTXSetup->ComponentPlane[2].ui32Height = pJPEGContext->MCUComponent[0].ui32YLimit / 2;
         break;
+    default:
+        drv_debug_msg(VIDEO_DEBUG_ERROR, "Not supported FOURCC: %x!\n", pJPEGContext->eFormat);
+        return IMG_ERR_INVALID_CONTEXT;
     }
 
     srf_buf_offset = pTFrame->psb_surface->buf.buffer_ofs;
-    RELOC_JPEG_PIC_PARAMS_PTG(&pJPEGContext->pMTXSetup->ComponentPlane[0].ui32PhysAddr, srf_buf_offset, &pTFrame->psb_surface->buf);
+    RELOC_JPEG_PIC_PARAMS_PTG(&pJPEGContext->pMTXSetup->ComponentPlane[0].ui32PhysAddr, srf_buf_offset, 
+                              &pTFrame->psb_surface->buf);
     switch (pJPEGContext->eFormat) {
     case IMG_CODEC_PL12:
         RELOC_JPEG_PIC_PARAMS_PTG(&pJPEGContext->pMTXSetup->ComponentPlane[1].ui32PhysAddr,
@@ -535,7 +543,7 @@ static IMG_ERRORCODE SetMTXSetup(
                                   &pTFrame->psb_surface->buf);
         break;
     default:
-        drv_debug_msg(VIDEO_DEBUG_ERROR, " Not supported FOURCC %x!\n", pJPEGContext->eFormat);
+        drv_debug_msg(VIDEO_DEBUG_ERROR, "Not supported FOURCC: %x!\n", pJPEGContext->eFormat);
         return IMG_ERR_INVALID_CONTEXT;
     }
 
@@ -951,11 +959,22 @@ static void tng_jpeg_QueryConfigAttributes(
 static VAStatus tng_jpeg_ValidateConfig(
     object_config_p obj_config)
 {
-    VAStatus vaStatus = VA_STATUS_SUCCESS;
     drv_debug_msg(VIDEO_DEBUG_GENERAL, "tng_jpeg_ValidateConfig\n");
+    int i;
+    /* Check all attributes */
+    for (i = 0; i < obj_config->attrib_count; i++) {
+        switch (obj_config->attrib_list[i].type) {
+        case VAConfigAttribRTFormat:
+            /* Ignore */
+            break;
+        case VAConfigAttribRateControl:
+            break;
+        default:
+            return VA_STATUS_ERROR_ATTR_NOT_SUPPORTED;
+        }
+    }
 
-    return vaStatus;
-
+    return VA_STATUS_SUCCESS;
 }
 
 static VAStatus tng_jpeg_CreateContext(
@@ -1151,7 +1170,7 @@ static VAStatus tng_jpeg_BeginPicture(
     /* Set MTX setup struture */
     ret = SetMTXSetup(jpeg_ctx_p, ps_buf->src_surface);
     if (ret != IMG_ERR_OK)
-        return VA_STATUS_ERROR_UNKNOWN;
+        return ret;
     IssueMTXSetup(jpeg_ctx_p);
 
     /* Initialize the default quantization tables */
@@ -1331,7 +1350,7 @@ static VAStatus tng_jpeg_EndPicture(
 
         jpeg_ctx_p->sScan_Encode_Info.aBufferTable[ui16BCnt].ui16ScanNumber = jpeg_ctx_p->sScan_Encode_Info.ui16SScan--;
         jpeg_ctx_p->sScan_Encode_Info.aBufferTable[ui16BCnt].i8PipeNumber =
-            (1 == jpeg_ctx_p->NumCores) ? 0 : (ui16BCnt % jpeg_ctx_p->NumCores);
+            (1 == jpeg_ctx_p->NumCores) ? 0 : ((ui16BCnt+1) % jpeg_ctx_p->NumCores);
 
         if (jpeg_ctx_p->sScan_Encode_Info.ui16SScan > 0) {
             ui32NoMCUsToEncode = jpeg_ctx_p->sScan_Encode_Info.ui32NumberMCUsToEncodePerScan;

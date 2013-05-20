@@ -178,8 +178,8 @@ static VAStatus tng__set_custom_scaling_values(
     IMG_UINT32 *pui32QuantReg;
     IMG_UINT8  *apui8QuantTables[8];
     IMG_UINT32  ui32Table, ui32Val;
-    psb_buffer_p pCustomBuf = &(ctx->ctx_mem[ctx->ui32StreamID].bufs_custom_quant);
-    IMG_UINT32  custom_quant_size = ctx->ctx_mem_size.custom_quant;
+    psb_buffer_p pCustomBuf = NULL;
+    IMG_UINT32  custom_quant_size = 0;
 
     // Scanning order for coefficients, see section 8.5.5 of H.264 specification
     // Note that even for interlaced mode, hardware takes the scaling values as if frame zig-zag scanning were being used
@@ -208,6 +208,10 @@ static VAStatus tng__set_custom_scaling_values(
     if (ctx->bCustomScaling == IMG_FALSE) {
         return VA_STATUS_ERROR_UNKNOWN;
     }
+
+    pCustomBuf = &(ctx->ctx_mem[ctx->ui32StreamID].bufs_custom_quant);
+    custom_quant_size = ctx->ctx_mem_size.custom_quant;
+
 
     /* Copy quantization values (in header order) */
     pui8QuantMem = (IMG_UINT8*)(pCustomBuf);
@@ -352,7 +356,7 @@ IMG_UINT32 tng_send_codedbuf(
 
     tng_cmdbuf_insert_command(
         ctx->obj_context, ctx->ui32StreamID,
-        MTX_CMDID_PROVIDE_CODED_BUFFER | MTX_CMDID_PRIORITY,
+        MTX_CMDID_PROVIDE_CODED_BUFFER,
         F_ENCODE(object_buffer->size, MTX_MSG_PROVIDE_CODED_BUFFER_SIZE) |
         F_ENCODE(ui32SlotIndex, MTX_MSG_PROVIDE_CODED_BUFFER_SLOT),
         object_buffer->psb_buffer, tng_align_KB(ui32Offset));
@@ -684,7 +688,7 @@ IMG_UINT32 tng_send_source_frame(
 
     /* Send ProvideBuffer Command */
     tng_cmdbuf_insert_command(ctx->obj_context, ctx->ui32StreamID,
-        MTX_CMDID_PROVIDE_SOURCE_BUFFER | MTX_CMDID_PRIORITY,
+        MTX_CMDID_PROVIDE_SOURCE_BUFFER,
         0, &(cmdbuf->frame_mem), frame_mem_index);
 
     ++(cmdbuf->frame_mem_index);
@@ -712,7 +716,7 @@ IMG_UINT32 tng_send_rec_frames(
         F_ENCODE(bLongTerm, MTX_MSG_PROVIDE_REF_BUFFER_LT);
 
     tng_cmdbuf_insert_command(ctx->obj_context, ctx->ui32StreamID,
-        MTX_CMDID_PROVIDE_REF_BUFFER | MTX_CMDID_PRIORITY,
+        MTX_CMDID_PROVIDE_REF_BUFFER,
         ui32CmdData, &(rec_surface->psb_surface->buf), 0);
 
     return 0;
@@ -743,7 +747,7 @@ IMG_UINT32 tng_send_ref_frames(
     srf_buf_offset = ref_surface->psb_surface->buf.buffer_ofs;
     /* Send ProvideBuffer Command */
     tng_cmdbuf_insert_command(ctx->obj_context, ctx->ui32StreamID,
-        MTX_CMDID_PROVIDE_REF_BUFFER | MTX_CMDID_PRIORITY,
+        MTX_CMDID_PROVIDE_REF_BUFFER,
         ui32CmdData, &(ref_surface->psb_surface->buf), 0);
 
     return VA_STATUS_SUCCESS;
