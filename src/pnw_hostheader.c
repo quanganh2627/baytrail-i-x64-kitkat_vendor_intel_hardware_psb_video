@@ -527,7 +527,7 @@ static void pnw__H264_writebits_picture_header(
     pnw__write_upto8bits_elements(pMTX_Header,
                                   aui32ElementPointers,
                                   (0 << 7) |    // forbidden_zero_bit
-                                  (1 << 5) |    // nal_ref_idc (2 bits) = 1
+                                  (0x3 << 5) |    // nal_ref_idc (2 bits) = 1
                                   (8),  // nal_unit_tpye (5 bits) = 8
                                   8);
     // Byte aligned (bit 40)
@@ -597,10 +597,15 @@ static void pnw__H264_writebits_slice_header0(
      * Byte aligned (bit 32 or 24)
      * NOTE: Slice_Type and Frame_Type are always the same, hence SliceFrame_Type
      */
+    unsigned char nal_ref_idc = 0;
+    if (pSlHParams->SliceFrame_Type == SLHP_IDR_SLICEFRAME_TYPE)
+        nal_ref_idc = 0x3;
+    else
+        nal_ref_idc = 0x2;
     pnw__write_upto8bits_elements(
         mtx_hdr, elt_p,
         (0 << 7) |/* forbidden_zero_bit */
-        ((pSlHParams->SliceFrame_Type == SLHP_B_SLICEFRAME_TYPE ? 0 : 1) << 5) | /* nal_ref_idc (2 bits) = 0 for B-frame and 1 for I or P-frame */
+        (nal_ref_idc << 5) | /* nal_ref_idc (2 bits) = 0 for B-frame and 1 for I or P-frame */
         ((pSlHParams->SliceFrame_Type == SLHP_IDR_SLICEFRAME_TYPE ? 5 : 1)),/* nal_unit_tpye (5 bits) = I-frame IDR, and 1 for  rest */
         8);
 }
