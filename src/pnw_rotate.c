@@ -299,6 +299,11 @@ VAStatus psb_CreateRotateSurface(
     if (psb_surface) {
         CHECK_SURFACE_REALLOC(psb_surface, msvdx_rotate, need_realloc);
         if (need_realloc == 0) {
+            /* set rotate transfrom information */
+            if (share_info != NULL) {
+                share_info->metadata_rotate = VAROTATION2HAL(driver_data->va_rotate);
+                share_info->surface_rotate = VAROTATION2HAL(msvdx_rotate);
+            }
             goto exit;
         } else { /* free the old rotate surface */
             /*FIX ME: it is not safe to do that because surfaces may be in use for rendering.*/

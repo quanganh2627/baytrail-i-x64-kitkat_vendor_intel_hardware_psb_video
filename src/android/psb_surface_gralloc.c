@@ -233,6 +233,9 @@ VAStatus psb_CreateSurfacesFromGralloc(
                 obj_surface->share_info->used_by_widi = 0;
                 obj_surface->share_info->native_window = (void *)external_buffers->reserved[0] ;
 
+                obj_surface->share_info->width_origin = external_buffers->crop_width;
+                obj_surface->share_info->height_origin = external_buffers->crop_height;
+
                 drv_debug_msg(VIDEO_DEBUG_GENERAL, "%s : Create graphic buffer success"
                                          "surface_id= 0x%x, vaddr[0] (0x%x), vaddr[1] (0x%x)\n",
                                          __FUNCTION__, surfaceID, vaddr[GRALLOC_SUB_BUFFER0], vaddr[GRALLOC_SUB_BUFFER1]);

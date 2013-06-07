@@ -455,6 +455,8 @@ struct psb_surface_share_info_s {
     unsigned int rotate_chroma_u_stride;
     unsigned int rotate_chroma_v_stride;
     void *native_window;
+    int width_origin;
+    int height_origin;
 };
 
 struct object_surface_s {
