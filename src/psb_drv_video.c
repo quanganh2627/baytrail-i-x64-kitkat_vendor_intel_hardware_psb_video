@@ -567,6 +567,8 @@ void psb__destroy_surface(psb_driver_data_p driver_data, object_surface_p obj_su
         /* delete subpicture association */
         psb_SurfaceDeassociateSubpict(driver_data, obj_surface);
 
+	obj_surface->is_ref_surface = 0;
+
 	psb_surface_sync(obj_surface->psb_surface);
         psb_surface_destroy(obj_surface->psb_surface);
 
@@ -742,8 +744,7 @@ VAStatus psb_CreateSurfaces2(
         }
     }
 
-    if ((memory_type == 0 && pExternalBufDesc != NULL) ||
-            (memory_type !=0 && pExternalBufDesc == NULL)) {
+    if ((memory_type !=0 && pExternalBufDesc == NULL)) {
         return VA_STATUS_ERROR_INVALID_PARAMETER;
     }
     else if(memory_type !=0 && pExternalBufDesc != NULL) {
