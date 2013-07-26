@@ -33,7 +33,7 @@
 #include <linux/vsp_fw.h>
 
 #define CONTEXT_VPP_ID 0
-#define CONTEXT_VP8_ID 1
+#define CONTEXT_VP8_ID 0
 
 struct context_VPP_s {
 	object_context_p obj_context; /* back reference */
@@ -68,6 +68,8 @@ struct context_VPP_s {
 	unsigned int frc_param_offset;
 	unsigned int seq_param_sz;
 	unsigned int seq_param_offset;
+	unsigned int ref_param_sz;
+	unsigned int ref_param_offset;
 	struct VssProcDenoiseParameterBuffer denoise_deblock_param;
 	struct VssProcColorEnhancementParameterBuffer enhancer_param;
 	struct VssProcSharpenParameterBuffer sharpen_param;

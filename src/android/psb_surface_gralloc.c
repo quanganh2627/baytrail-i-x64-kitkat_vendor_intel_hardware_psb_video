@@ -162,6 +162,7 @@ VAStatus psb_CreateSurfacesFromGralloc(
         obj_surface->width_r = width;
         obj_surface->height_r = height;
         obj_surface->height_origin = height_origin;
+	obj_surface->is_ref_surface = 0;
 
         psb_surface = (psb_surface_p) calloc(1, sizeof(struct psb_surface_s));
         if (NULL == psb_surface) {
@@ -398,6 +399,8 @@ VAStatus psb_CreateSurfacesFromGralloc(
                 obj_surface->share_info->renderStatus = 0;
                 obj_surface->share_info->used_by_widi = 0;
                 obj_surface->share_info->native_window = (void *)external_buffers->reserved[0] ;
+
+                obj_surface->share_info->surface_protected = driver_data->protected;
 
                 drv_debug_msg(VIDEO_DEBUG_GENERAL, "%s : Create graphic buffer success"
                                          "surface_id= 0x%x, vaddr[0] (0x%x), vaddr[1] (0x%x)\n",
