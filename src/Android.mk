@@ -117,7 +117,7 @@ LOCAL_C_INCLUDES :=			\
     $(LOCAL_PATH)/hwdefs
 endif
 
-LOCAL_MODULE_TAGS := eng
+LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE := pvr_drv_video
 
 
