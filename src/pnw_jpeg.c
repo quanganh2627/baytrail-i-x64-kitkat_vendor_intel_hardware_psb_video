@@ -407,21 +407,25 @@ static VAStatus pnw__jpeg_process_qmatrix_param(context_ENC_p ctx, object_buffer
     VAQMatrixBufferJPEG *pBuffer;
     JPEG_MTX_QUANT_TABLE* pQMatrix = (JPEG_MTX_QUANT_TABLE *)
                                      (ctx->jpeg_ctx->pMemInfoTableBlock);
+    int i;
 
     ASSERT(obj_buffer->type == VAQMatrixBufferType);
 
     pBuffer = (VAQMatrixBufferJPEG *) obj_buffer->buffer_data;
 
+    /* Zero value isn't allowed. It will cause JPEG firmware time out */
     if (0 != pBuffer->load_lum_quantiser_matrix) {
-        memcpy(pQMatrix->aui8LumaQuantParams,
-               pBuffer->lum_quantiser_matrix,
-               QUANT_TABLE_SIZE_BYTES);
+        for (i = 0; i < QUANT_TABLE_SIZE_BYTES; i++)
+            if (pBuffer->lum_quantiser_matrix[i] != 0)
+                pQMatrix->aui8LumaQuantParams[i] =
+                    pBuffer->lum_quantiser_matrix[i];
     }
 
     if (0 != pBuffer->load_chroma_quantiser_matrix) {
-        memcpy(pQMatrix->aui8ChromaQuantParams,
-               pBuffer->chroma_quantiser_matrix,
-               QUANT_TABLE_SIZE_BYTES);
+        for (i = 0; i < QUANT_TABLE_SIZE_BYTES; i++)
+            if (pBuffer->chroma_quantiser_matrix[i] != 0)
+                pQMatrix->aui8ChromaQuantParams[i] =
+                    pBuffer->chroma_quantiser_matrix[i];
     }
 
     free(obj_buffer->buffer_data);
@@ -591,9 +595,6 @@ VAStatus pnw_jpeg_AppendMarkers(object_context_p obj_context, unsigned char *raw
         if (ui16BCnt > 0 && pContext->sScan_Encode_Info.ui8NumberOfCodedBuffers > 1) {
             drv_debug_msg(VIDEO_DEBUG_GENERAL, "Append 2 bytes Reset Interval %d "
                                      "to Coded Buffer Part %d\n", ui16BCnt - 1, ui16BCnt);
-
-             while(*(pSegStart +sizeof(BUFFER_HEADER) + pBufHeader->ui32BytesUsed - 1) == 0xff)
-                 pBufHeader->ui32BytesUsed--;
 
             while(*(pSegStart +sizeof(BUFFER_HEADER) + pBufHeader->ui32BytesUsed - 1) == 0xff)
                 pBufHeader->ui32BytesUsed--;
