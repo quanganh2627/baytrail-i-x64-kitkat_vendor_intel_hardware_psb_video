@@ -64,6 +64,8 @@
 #define tng_align_64(X)  (((X)+63) &~63)
 #define tng_align_4(X)  (((X)+3) &~3)
 
+#define MTX_CONTEXT_ITEM_OFFSET(type, member) (size_t)&(((type*)0)->member)
+
 #define DEFAULT_CABAC_DB_MARGIN    (0x190)
 #define NOT_USED_BY_TOPAZ 0
 /*
@@ -1605,13 +1607,12 @@ static void tng__setup_rcdata(context_ENC_p ctx)
 
     psPicParams->sInParams.i32InitialDelay	= psRCParams->i32InitialDelay;
     psPicParams->sInParams.i32InitialLevel	= psRCParams->i32InitialLevel;
-    psRCParams->ui32InitialQp				= psPicParams->sInParams.ui8SeInitQP;
+    psRCParams->ui32InitialQp = psPicParams->sInParams.ui8SeInitQP;
 
     /* The rate control uses this value to adjust the reaction rate to larger than expected frames */
     if (ctx->eStandard == IMG_STANDARD_H264) {
         if (psPicParams->sInParams.i32BitsPerFrm) {
             const IMG_INT32 bitsPerGop = (psRCParams->ui32BitsPerSecond / psRCParams->ui32FrameRate) * psRCParams->ui32IntraFreq;
-
             psPicParams->sInParams.mode.h264.ui32RCScaleFactor = (bitsPerGop * 256) /
                 (psPicParams->sInParams.i32BufferSize - psPicParams->sInParams.i32InitialLevel);
         } else {
@@ -2532,7 +2533,6 @@ static void VIDEO_CalcCoefs_FromPitch (IMG_FLOAT	fPitch, IMG_UINT8 aui8Table[4][
 }
 #endif
 
-
 static void tng__setvideo_params(context_ENC_p ctx, IMG_UINT32 ui32StreamIndex)
 {
     context_ENC_mem *ps_mem = &(ctx->ctx_mem[ui32StreamIndex]);
@@ -3339,14 +3339,14 @@ static VAStatus tng__update_bitrate(context_ENC_p ctx, IMG_UINT32 ui32StreamInde
     VAStatus vaStatus = VA_STATUS_SUCCESS;
     IMG_RC_PARAMS *psRCParams = &(ctx->sRCParams);
     IMG_UINT32 ui32CmdData = 0;
-    IMG_UINT32 ui32NewBitrate = 0;
+    IMG_UINT32 ui32NewBitsPerFrame = 0;
     IMG_UINT8 ui8NewVCMIFrameQP = 0;
 
     if (psRCParams->bBitrateChanged == IMG_FALSE) {
         return vaStatus;
     }
 
-    //tng__setup_rcdata(ctx);
+    tng__setup_rcdata(ctx);
     drv_debug_msg(VIDEO_DEBUG_GENERAL,
         "%s: ui32BitsPerSecond = %d, ui32FrameRate = %d, ui32InitialQp = %d\n",
         __FUNCTION__, psRCParams->ui32BitsPerSecond,
@@ -3355,17 +3355,57 @@ static VAStatus tng__update_bitrate(context_ENC_p ctx, IMG_UINT32 ui32StreamInde
         "%s: frame_count[%d] = %d\n", __FUNCTION__,
         ui32StreamIndex, ctx->ui32FrameCount[ui32StreamIndex]);
 
-    ui32NewBitrate = psRCParams->ui32BitsPerSecond / psRCParams->ui32FrameRate;
+    ui32NewBitsPerFrame = psRCParams->ui32BitsPerSecond / psRCParams->ui32FrameRate;
     ui8NewVCMIFrameQP = (IMG_UINT8)psRCParams->ui32InitialQp;
 
     ui32CmdData = F_ENCODE(ui8NewVCMIFrameQP, MTX_MSG_RC_UPDATE_QP) |
-                F_ENCODE(ui32NewBitrate, MTX_MSG_RC_UPDATE_BITRATE);
+                F_ENCODE(ui32NewBitsPerFrame, MTX_MSG_RC_UPDATE_BITRATE);
 
     tng_cmdbuf_insert_command(ctx->obj_context, ctx->ui32StreamID,
-        MTX_CMDID_PICMGMT | MTX_CMDID_PRIORITY,
+        MTX_CMDID_RC_UPDATE,
         ui32CmdData, 0, 0);
 
     psRCParams->bBitrateChanged = IMG_FALSE;
+    return vaStatus;
+}
+
+/*
+ * Update IMG_MTX_VIDEO_CONTEXT buffer.
+ * NOTE: Offset must be 4 byte aligned.
+*/
+static VAStatus tng__update_mtx_context(context_ENC_p ctx, unsigned int offset, int value, unsigned int stream_id)
+{
+    VAStatus vaStatus = VA_STATUS_SUCCESS;
+    context_ENC_cmdbuf *ps_cmd = &(ctx->ctx_cmdbuf[stream_id]);
+    tng_cmdbuf_p cmdbuf = ctx->obj_context->tng_cmdbuf;
+
+    if ((offset < 0) || (offset % 4) || (value < 0)) {
+        drv_debug_msg(VIDEO_DEBUG_ERROR, "invalid parameter");
+	return VA_STATUS_ERROR_INVALID_PARAMETER;
+    }
+
+    tng_cmdbuf_insert_command(ctx->obj_context, ctx->ui32StreamID,
+	MTX_CMDID_SW_UPDATE_MTX_CONTEXT,
+        0, 0, 0);
+
+    tng_cmdbuf_insert_command_param(offset);
+    tng_cmdbuf_insert_command_param(value);
+
+    return vaStatus;
+}
+
+static VAStatus tng__update_frametype(context_ENC_p ctx, IMG_FRAME_TYPE eFrameType)
+{
+    VAStatus vaStatus = VA_STATUS_SUCCESS;
+    IMG_UINT32 ui32CmdData = 0;
+
+    ui32CmdData = F_ENCODE(IMG_PICMGMT_REF_TYPE, MTX_MSG_PICMGMT_SUBTYPE) |
+                F_ENCODE(eFrameType, MTX_MSG_PICMGMT_DATA);
+
+    tng_cmdbuf_insert_command(ctx->obj_context, ctx->ui32StreamID,
+        MTX_CMDID_PICMGMT ,
+        ui32CmdData, 0, 0);
+
     return vaStatus;
 }
 
@@ -3522,6 +3562,8 @@ VAStatus tng_EndPicture(context_ENC_p ctx)
 {
     VAStatus vaStatus = VA_STATUS_SUCCESS;
     tng_cmdbuf_p cmdbuf = ctx->obj_context->tng_cmdbuf;
+    unsigned int offset;
+    int value;
 
     drv_debug_msg(VIDEO_DEBUG_GENERAL,"%s: ctx->ui8SlicesPerPicture = %d, ctx->ui32FrameCount[0] = %d\n",
          __FUNCTION__, ctx->ui8SlicesPerPicture, ctx->ui32FrameCount[0]);
@@ -3547,11 +3589,25 @@ VAStatus tng_EndPicture(context_ENC_p ctx)
         }
     }
 
-    if (ctx->sRCParams.eRCMode == IMG_RCMODE_VCM) {
-         vaStatus = tng__update_bitrate(ctx, ctx->ui32StreamID);
+    if (ctx->sRCParams.eRCMode != IMG_RCMODE_NONE) {
+        vaStatus = tng__update_bitrate(ctx, ctx->ui32StreamID);
         if (vaStatus != VA_STATUS_SUCCESS) {
             drv_debug_msg(VIDEO_DEBUG_ERROR, "send picmgmt");
         }
+    }
+
+    if (ctx->idr_force_flag == 1){
+        vaStatus = tng__update_frametype(ctx, IMG_FRAME_IDR);
+        if (vaStatus != VA_STATUS_SUCCESS) {
+            drv_debug_msg(VIDEO_DEBUG_ERROR, "send picmgmt IDR");
+        }
+	offset = (unsigned int)MTX_CONTEXT_ITEM_OFFSET(IMG_MTX_VIDEO_CONTEXT, ui32IntraLoopCnt);
+	value = ctx->ui32IntraCnt;
+	vaStatus = tng__update_mtx_context(ctx, offset, value, 0);
+        if (vaStatus != VA_STATUS_SUCCESS) {
+            drv_debug_msg(VIDEO_DEBUG_ERROR, "update mtx context");
+        }
+        ctx->idr_force_flag =0;
     }
 
     vaStatus = tng__cmdbuf_provide_buffer(ctx, ctx->ui32StreamID);

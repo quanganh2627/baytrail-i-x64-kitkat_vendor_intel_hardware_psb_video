@@ -509,7 +509,7 @@ static void tng__H264ES_writebits_picture_header(
     tng__write_upto8bits_elements(pMTX_Header,
                                   aui32ElementPointers,
                                   (0 << 7) |    // forbidden_zero_bit
-                                  (1 << 5) |    // nal_ref_idc (2 bits) = 1
+                                  (3 << 5) |    // nal_ref_idc (2 bits) = 0x3
                                   (8),  // nal_unit_tpye (5 bits) = 8
                                   8);
    // Byte aligned (bit 40)
@@ -645,7 +645,7 @@ static void tng__H264ES_writebits_sequence_header(
     // Byte aligned (bit 32)
     tng__write_upto8bits_elements(pMTX_Header, 
         aui32ElementPointers,(0 << 7) | // forbidden_zero_bit=0
-	(0x3 << 5) | // nal_ref_idc=01 (may be 11)
+	(0x3 << 5) | // nal_ref_idc=0x3
 	(7), // nal_unit_type=00111
         8);
     // Byte aligned (bit 40)
@@ -657,8 +657,8 @@ static void tng__H264ES_writebits_sequence_header(
             // Byte	aligned	(bit 48)
             tng__write_upto8bits_elements(pMTX_Header, aui32ElementPointers,
                 (1 << 7) |    // constraint_set0_flag = 1 for BP constraints
-                ((bASO ? 0 : 1) << 6) |    // constraint_set1_flag = 1 for MP constraints
-                (1 << 5) |    // constraint_set2_flag = 1 for EP constraints
+                (0 << 6) |    // constraint_set1_flag = 0 for MP constraints
+                (0 << 5) |    // constraint_set2_flag = 0 for EP constraints
                 ((pSHParams->ucLevel==SH_LEVEL_1B ? 1:0) << 4),  // constraint_set3_flag = 1 for level 1b, 0 for others
                 // reserved_zero_4bits = 0
                 8);
@@ -671,7 +671,7 @@ static void tng__H264ES_writebits_sequence_header(
             tng__write_upto8bits_elements(pMTX_Header, aui32ElementPointers,
                 (0 << 7) | // constraint_set0_flag = 0 for no BP constraints
                 (1 << 6) | // constraint_set1_flag = 1 for MP constraints
-                (1 << 5) | // constraint_set2_flag = 1 for EP constraints
+                (0 << 5) | // constraint_set2_flag = 0 for EP constraints
                 ((pSHParams->ucLevel==SH_LEVEL_1B ? 1:0) << 4),    // constraint_set3_flag = 1 for level 1b, 0 for others
                 // reserved_zero_4bits = 0
                 8);
@@ -3272,7 +3272,7 @@ static void tng__H264ES_notforsims_writebits_slice_header(
 
     tng__write_upto8bits_elements(pMTX_Header, aui32ElementPointers, 0, 1);   // forbidden_zero_bit
 
-    tng__insert_element_token(pMTX_Header, aui32ElementPointers, ELEMENT_REFERENCE); //MTX fills this value in
+    tng__write_upto8bits_elements(pMTX_Header, aui32ElementPointers, ((pSlHParams->SliceFrame_Type == SLHP_IDR_SLICEFRAME_TYPE ? 3 : ELEMENT_REFERENCE)), 2);// nal_ref_idc, 0x03 for IDR slice, for non-IDR slice, fw chose a value
     tng__insert_element_token(pMTX_Header, aui32ElementPointers, ELEMENT_RAWDATA);
 
     tng__write_upto8bits_elements(pMTX_Header, aui32ElementPointers, ((pSlHParams->SliceFrame_Type == SLHP_IDR_SLICEFRAME_TYPE ? 5 : 1)),                   // nal_unit_tpye (5 bits) = I-frame IDR, and 1 for  rest
