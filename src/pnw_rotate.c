@@ -95,7 +95,8 @@ static int isVppOn() {
     }
     buf[MAXLEN - 1] = '\0';
 
-    if(strstr(buf, "true") == NULL) {
+    if((strstr(buf, "1vpp") == NULL)
+            && (strstr(buf, "1frc") == NULL)) {
         fclose(handle);
         return 0;
     }
@@ -288,7 +289,7 @@ void psb_CheckInterlaceRotate(object_context_p obj_context, unsigned char *pic_p
         VAPictureParameterBufferVC1 *pic_params = (VAPictureParameterBufferVC1 *)pic_param_tmp;
 
         /* is it the right way to check? */
-        if (pic_params->sequence_fields.bits.interlace && (pic_params->picture_fields.bits.frame_coding_mode == VC1_FCM_FLDI))
+        if (pic_params->sequence_fields.bits.interlace)
             obj_context->interlaced_stream = 1;
 
         break;
