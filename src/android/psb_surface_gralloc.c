@@ -32,6 +32,9 @@
 #include <gralloc.h>
 #include "android/psb_gralloc.h"
 #include "android/psb_android_glue.h"
+#ifndef BAYTRAIL
+#include <hal/hal_public.h>
+#endif
 
 #define INIT_DRIVER_DATA    psb_driver_data_p driver_data = (psb_driver_data_p) ctx->pDriverData;
 #define CONFIG(id)  ((object_config_p) object_heap_lookup( &driver_data->config_heap, id ))
@@ -46,8 +49,6 @@ enum {
     GRALLOC_SUB_BUFFER2,
     GRALLOC_SUB_BUFFER_MAX,
 };
-
-#define HAL_PIXEL_FORMAT_NV12 0x3231564E
 
 VAStatus psb_DestroySurfaceGralloc(object_surface_p obj_surface)
 {
@@ -122,15 +123,15 @@ VAStatus psb_CreateSurfacesFromGralloc(
     }
 
     CHECK_INVALID_PARAM(external_buffers == NULL);
-
+    /* temp set tiling as 0, need query with gralloc function */
+    external_buffers->tiling = 0;
     /*
     vaStatus = psb__checkSurfaceDimensions(driver_data, width, height);
     CHECK_VASTATUS();
     */
     /* Adjust height to be a multiple of 32 (height of macroblock in interlaced mode) */
     height_origin = height;
-    if (external_buffers->pixel_format != HAL_PIXEL_FORMAT_NV12)
-        height = (height + 0x1f) & ~0x1f;
+    height = (height + 0x1f) & ~0x1f;
     LOGD("external_buffers->pixel_format is 0x%x.\n", external_buffers->pixel_format);
     /* get native window from the reserved field */
     driver_data->native_window = (void *)external_buffers->reserved[0];
@@ -191,9 +192,6 @@ VAStatus psb_CreateSurfacesFromGralloc(
 #endif
         /*hard code the gralloc buffer usage*/
         usage = GRALLOC_USAGE_HW_TEXTURE | GRALLOC_USAGE_HW_COMPOSER;
-
-        if (external_buffers->pixel_format == HAL_PIXEL_FORMAT_NV12)
-            usage |= GRALLOC_USAGE_SW_READ_OFTEN;
 
         /* usage hack for byt */
         usage |= GRALLOC_USAGE_SW_READ_OFTEN | GRALLOC_USAGE_SW_WRITE_OFTEN;
@@ -295,7 +293,11 @@ VAStatus psb_CreateSurfacesFromGralloc(
     */
     /* Adjust height to be a multiple of 32 (height of macroblock in interlaced mode) */
     height_origin = height;
-    if (external_buffers->pixel_format != HAL_PIXEL_FORMAT_NV12)
+
+    IMG_native_handle_t* h = (IMG_native_handle_t*)external_buffers->buffers[0];
+    int gfx_colorformat = h->iFormat;
+
+    if (gfx_colorformat != HAL_PIXEL_FORMAT_NV12)
         height = (height + 0x1f) & ~0x1f;
 
     /* get native window from the reserved field */
@@ -357,7 +359,7 @@ VAStatus psb_CreateSurfacesFromGralloc(
         /*hard code the gralloc buffer usage*/
         usage = GRALLOC_USAGE_HW_TEXTURE | GRALLOC_USAGE_HW_COMPOSER;
 
-        if (external_buffers->pixel_format == HAL_PIXEL_FORMAT_NV12)
+        if (gfx_colorformat == HAL_PIXEL_FORMAT_NV12)
             usage |= GRALLOC_USAGE_SW_READ_OFTEN;
         else {
 #ifdef PSBVIDEO_MRFL
@@ -379,7 +381,7 @@ VAStatus psb_CreateSurfacesFromGralloc(
             psb_surface->buf.handle = handle;
             obj_surface->share_info = NULL;
 
-            if (external_buffers->pixel_format != HAL_PIXEL_FORMAT_NV12) {
+            if (gfx_colorformat != HAL_PIXEL_FORMAT_NV12) {
                 obj_surface->share_info = (psb_surface_share_info_t *)vaddr[GRALLOC_SUB_BUFFER1];
                 memset(obj_surface->share_info, 0, sizeof(struct psb_surface_share_info_s));
                 obj_surface->share_info->force_output_method = protected ? OUTPUT_FORCE_OVERLAY : 0;
