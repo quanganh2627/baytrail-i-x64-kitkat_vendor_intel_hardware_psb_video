@@ -64,6 +64,8 @@
 #define PRELOAD_BUFFER_SIZE        (4*1024)
 #define AUXMSB_BUFFER_SIZE         (1024*1024)
 
+#define HW_SUPPORTED_MAX_PICTURE_WIDTH_VC1   1920
+#define HW_SUPPORTED_MAX_PICTURE_HEIGHT_VC1  1088
 
 typedef struct {
     IMG_UINT32              ui32ContextId;
@@ -289,7 +291,30 @@ static void pnw_VC1_QueryConfigAttributes(
     VAConfigAttrib *attrib_list,
     int num_attribs)
 {
-    /* No VC1 specific attributes */
+    int i;
+    drv_debug_msg(VIDEO_DEBUG_GENERAL, "pnw_VC1_QueryConfigAttributes\n");
+
+    for (i = 0; i < num_attribs; i++) {
+        switch (attrib_list[i].type) {
+        case VAConfigAttribMaxPictureWidth:
+            if ((entrypoint == VAEntrypointVLD) &&
+                (profile == VAProfileVC1Advanced))
+                attrib_list[i].value = HW_SUPPORTED_MAX_PICTURE_WIDTH_VC1;
+            else
+                attrib_list[i].value = VA_ATTRIB_NOT_SUPPORTED;
+            break;
+        case VAConfigAttribMaxPictureHeight:
+            if ((entrypoint == VAEntrypointVLD) &&
+                (profile == VAProfileVC1Advanced))
+                attrib_list[i].value = HW_SUPPORTED_MAX_PICTURE_HEIGHT_VC1;
+            else
+                attrib_list[i].value = VA_ATTRIB_NOT_SUPPORTED;
+            break;
+        default:
+            break;
+        }
+    }
+
 }
 
 static VAStatus pnw_VC1_ValidateConfig(
@@ -1936,7 +1961,7 @@ static void psb__VC1_send_rendec_params(context_VC1_p ctx, VASliceParameterBuffe
     vld_dec_setup_alternative_frame(ctx->obj_context);
 
     if (ctx->pic_params->picture_fields.bits.frame_coding_mode == VC1_FCM_P && CONTEXT_ROTATE(ctx->obj_context))
-        deblock_surface = ctx->obj_context->current_render_target->psb_surface_rotate;
+        deblock_surface = ctx->obj_context->current_render_target->out_loop_surface;
 
     /* CHUNK: 3 */
     psb_cmdbuf_rendec_start(cmdbuf, RENDEC_REGISTER_OFFSET(MSVDX_CMDS, VC1_LUMA_RANGE_MAPPING_BASE_ADDRESS));

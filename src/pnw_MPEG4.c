@@ -70,6 +70,11 @@
 #define MPEG4_PROFILE_SIMPLE    0
 #define MPEG4_PROFILE_ASP    2
 
+#define HW_SUPPORTED_MAX_PICTURE_WIDTH_MPEG4   1920
+#define HW_SUPPORTED_MAX_PICTURE_HEIGHT_MPEG4  1088
+#define HW_SUPPORTED_MAX_PICTURE_WIDTH_H263    720
+#define HW_SUPPORTED_MAX_PICTURE_HEIGHT_H263   576
+
 /* Table V2-2 ISO/IEC 14496-2:2001(E) - sprite enable codewords */
 typedef enum {
     SPRITE_NOT_USED = 0,
@@ -1138,6 +1143,8 @@ struct context_MPEG4_s {
 
     struct psb_buffer_s *data_partition_buffer0;
     struct psb_buffer_s *data_partition_buffer1;
+
+    uint32_t field_type;
 };
 
 typedef struct context_MPEG4_s *context_MPEG4_p;
@@ -1174,21 +1181,28 @@ static void pnw_MPEG4_QueryConfigAttributes(
     for (i = 0; i < num_attribs; i++) {
         switch (attrib_list[i].type) {
         case VAConfigAttribMaxPictureWidth:
-            if ((entrypoint == VAEntrypointVLD) &&
-                (profile == VAProfileH263Baseline))
-                attrib_list[i].value = 720;
+            if (entrypoint == VAEntrypointVLD) {
+                if (profile == VAProfileMPEG4AdvancedSimple)
+                    attrib_list[i].value = HW_SUPPORTED_MAX_PICTURE_WIDTH_MPEG4;
+                else if(profile == VAProfileH263Baseline)
+                    attrib_list[i].value = HW_SUPPORTED_MAX_PICTURE_WIDTH_H263;
+                else
+                    attrib_list[i].value = VA_ATTRIB_NOT_SUPPORTED;
+            }
             else
                 attrib_list[i].value = VA_ATTRIB_NOT_SUPPORTED;
             break;
         case VAConfigAttribMaxPictureHeight:
-            if ((entrypoint == VAEntrypointVLD) &&
-                (profile == VAProfileH263Baseline))
-                attrib_list[i].value = 576;
+            if (entrypoint == VAEntrypointVLD) {
+                if (profile == VAProfileMPEG4AdvancedSimple)
+                    attrib_list[i].value = HW_SUPPORTED_MAX_PICTURE_HEIGHT_MPEG4;
+                else if(profile == VAProfileH263Baseline)
+                    attrib_list[i].value = HW_SUPPORTED_MAX_PICTURE_HEIGHT_H263;
+            }
             else
                 attrib_list[i].value = VA_ATTRIB_NOT_SUPPORTED;
             break;
         default:
-            attrib_list[i].value = VA_ATTRIB_NOT_SUPPORTED;
             break;
         }
     }
@@ -1326,6 +1340,8 @@ static VAStatus pnw_MPEG4_CreateContext(
         vaStatus = vld_dec_CreateContext(&ctx->dec_ctx, obj_context);
         DEBUG_FAILURE;
     }
+
+    ctx->field_type = 2;
 
     if (vaStatus != VA_STATUS_SUCCESS) {
         pnw_MPEG4_DestroyContext(obj_context);
@@ -2017,10 +2033,43 @@ static void psb__MPEG4_end_slice(context_DEC_p dec_ctx)
 {
     context_MPEG4_p ctx = (context_MPEG4_p)dec_ctx;
 
+#ifdef PSBVIDEO_MSVDX_EC
+    if (ctx->obj_context->driver_data->ec_enabled)
+        ctx->obj_context->flags |= (FW_ERROR_DETECTION_AND_RECOVERY); /* FW_ERROR_DETECTION_AND_RECOVERY */
+#endif
+
     ctx->obj_context->first_mb = 0;
     ctx->obj_context->last_mb = ((ctx->picture_height_mb - 1) << 8) | (ctx->picture_width_mb - 1);
     *(ctx->dec_ctx.slice_first_pic_last) = (ctx->obj_context->first_mb << 16) | (ctx->obj_context->last_mb);
 }
+
+#ifdef PSBVIDEO_MSVDX_EC
+static void psb__MPEG4_choose_ec_frames(context_MPEG4_p ctx)
+{
+    int is_inter = (ctx->pic_params->vop_fields.bits.vop_coding_type == PICTURE_CODING_P ||
+		    ctx->pic_params->vop_fields.bits.vop_coding_type == PICTURE_CODING_B);
+
+    ctx->obj_context->ec_target = NULL;
+
+    /* choose forward ref frame as possible */
+    if (is_inter && ctx->forward_ref_surface)
+        ctx->obj_context->ec_target = ctx->forward_ref_surface;
+
+    /* Otherwise we conceal from the previous I or P frame*/
+    if (!ctx->obj_context->ec_target)
+    {
+        ctx->obj_context->ec_target = ctx->obj_context->ec_candidate;
+    }
+
+    if (ctx->pic_params->vop_fields.bits.vop_coding_type != PICTURE_CODING_B)
+    {
+        ctx->obj_context->ec_candidate = ctx->obj_context->current_render_target; /* in case the next frame is an I frame we will need this */
+    }
+    if (!ctx->obj_context->ec_target) {
+        ctx->obj_context->ec_target = ctx->obj_context->current_render_target;
+    }
+}
+#endif
 
 static VAStatus pnw_MPEG4_BeginPicture(
     object_context_p obj_context)
@@ -2070,6 +2119,48 @@ static VAStatus pnw_MPEG4_EndPicture(
     object_context_p obj_context)
 {
     INIT_CONTEXT_MPEG4
+    psb_surface_p target_surface = ctx->obj_context->current_render_target->psb_surface;
+    psb_driver_data_p driver_data = obj_context->driver_data;
+    VAStatus vaStatus = VA_STATUS_SUCCESS;
+
+#ifdef PSBVIDEO_MSVDX_EC
+    /* Sent the HOST_BE_OPP command to detect slice error */
+    if (ctx->pic_params && ctx->pic_params->vol_fields.bits.interlaced)
+        driver_data->ec_enabled = 0;
+
+    if (driver_data->ec_enabled) {
+        uint32_t rotation_flags = 0;
+        uint32_t ext_stride_a = 0;
+        object_surface_p ec_target;
+
+        psb__MPEG4_choose_ec_frames(ctx);
+        ec_target = ctx->obj_context->ec_target;
+        REGIO_WRITE_FIELD_LITE(ext_stride_a, MSVDX_CMDS, EXTENDED_ROW_STRIDE, EXT_ROW_STRIDE, target_surface->stride / 64);
+
+    /* FIXME ec ignor rotate condition */
+        if(ec_target) {
+	    if (psb_context_get_next_cmdbuf(ctx->obj_context)) {
+                vaStatus = VA_STATUS_ERROR_UNKNOWN;
+                DEBUG_FAILURE;
+                return vaStatus;
+            }
+
+            if (psb_context_submit_host_be_opp(ctx->obj_context,
+                                          &target_surface->buf,
+                                          &ec_target->psb_surface->buf,
+                                          NULL,
+                                          ctx->picture_width_mb,
+                                          ctx->picture_height_mb,
+                                          rotation_flags,
+                                          ctx->field_type,
+                                          ext_stride_a,
+                                          target_surface->chroma_offset + target_surface->buf.buffer_ofs,
+                                          ec_target->psb_surface->chroma_offset + ec_target->psb_surface->buf.buffer_ofs)) {
+                  return VA_STATUS_ERROR_UNKNOWN;
+            }
+        }
+    }
+#endif
 
     if (psb_context_flush_cmdbuf(ctx->obj_context)) {
         return VA_STATUS_ERROR_UNKNOWN;

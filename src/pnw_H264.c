@@ -67,6 +67,9 @@
 #define MSVDX_COMMANDS_BASE_MTX 0x1000
 #define MSVDX_IQRAM_BASE_MTX    0x700
 
+#define HW_SUPPORTED_MAX_PICTURE_WIDTH_H264   1920
+#define HW_SUPPORTED_MAX_PICTURE_HEIGHT_H264  1088
+
 #define SLICEDATA_BUFFER_TYPE(type) ((type==VASliceDataBufferType)?"VASliceDataBufferType":"VAProtectedSliceDataBufferType")
 
 typedef enum {
@@ -302,7 +305,30 @@ static void pnw_H264_QueryConfigAttributes(
     VAConfigAttrib *attrib_list,
     int num_attribs)
 {
-    /* No H264 specific attributes */
+    int i;
+    drv_debug_msg(VIDEO_DEBUG_GENERAL, "pnw_H264_QueryConfigAttributes\n");
+
+    for (i = 0; i < num_attribs; i++) {
+        switch (attrib_list[i].type) {
+        case VAConfigAttribMaxPictureWidth:
+            if ((entrypoint == VAEntrypointVLD) &&
+                (profile == VAProfileH264High))
+                attrib_list[i].value = HW_SUPPORTED_MAX_PICTURE_WIDTH_H264;
+            else
+                attrib_list[i].value = VA_ATTRIB_NOT_SUPPORTED;
+            break;
+        case VAConfigAttribMaxPictureHeight:
+            if ((entrypoint == VAEntrypointVLD) &&
+                (profile == VAProfileH264High))
+                attrib_list[i].value = HW_SUPPORTED_MAX_PICTURE_HEIGHT_H264;
+            else
+                attrib_list[i].value = VA_ATTRIB_NOT_SUPPORTED;
+            break;
+        default:
+            break;
+        }
+    }
+
 }
 
 static VAStatus pnw_H264_ValidateConfig(
@@ -1553,6 +1579,8 @@ static void psb__H264_end_slice(context_DEC_p dec_ctx)
 #ifdef PSBVIDEO_MSVDX_EC
 static void psb__H264_choose_ec_frames(context_H264_p ctx)
 {
+    ctx->obj_context->ec_target = NULL;
+
     /* If reference picture list has a valid entry, this is a P or B frame and we conceal from the frame that is at the top of the list*/
     if (ctx->slice_param->num_ref_idx_l0_active_minus1 >= 0)
     {
@@ -1641,10 +1669,11 @@ static VAStatus pnw_H264_EndPicture(
     INIT_CONTEXT_H264
     psb_surface_p target_surface = ctx->obj_context->current_render_target->psb_surface;
     psb_driver_data_p driver_data = obj_context->driver_data;
+    VAStatus vaStatus = VA_STATUS_SUCCESS;
 
     if (ctx->two_pass_mode) {
         psb_buffer_p colocated_target_buffer = vld_dec_lookup_colocated_buffer(&ctx->dec_ctx, target_surface);
-        psb_surface_p rotate_surface = ctx->obj_context->current_render_target->psb_surface_rotate;
+        psb_surface_p rotate_surface = ctx->obj_context->current_render_target->out_loop_surface;
         uint32_t rotation_flags = 0;
         uint32_t ext_stride_a = 0;
 
@@ -1720,7 +1749,13 @@ static VAStatus pnw_H264_EndPicture(
         REGIO_WRITE_FIELD_LITE(ext_stride_a, MSVDX_CMDS, EXTENDED_ROW_STRIDE, EXT_ROW_STRIDE, target_surface->stride / 64);
 
     /* FIXME ec ignor rotate condition */
-        if(ec_target)
+        if(ec_target) {
+	    if (psb_context_get_next_cmdbuf(ctx->obj_context)) {
+                vaStatus = VA_STATUS_ERROR_UNKNOWN;
+                DEBUG_FAILURE;
+                return vaStatus;
+            }
+
             if (psb_context_submit_host_be_opp(ctx->obj_context,
                                           &target_surface->buf,
                                           &ec_target->psb_surface->buf,
@@ -1732,10 +1767,20 @@ static VAStatus pnw_H264_EndPicture(
                                           ext_stride_a,
                                           target_surface->chroma_offset + target_surface->buf.buffer_ofs,
                                           ec_target->psb_surface->chroma_offset + ec_target->psb_surface->buf.buffer_ofs)) {
-            return VA_STATUS_ERROR_UNKNOWN;
+                return VA_STATUS_ERROR_UNKNOWN;
+            }
         }
     }
 #endif
+
+    /* if scaling is enabled, rotate is not performed in 1st pass */
+    if (CONTEXT_ROTATE(obj_context) && CONTEXT_SCALING(obj_context))
+    {
+        vld_dec_yuv_rotate(obj_context,
+                ctx->picture_width_mb * 16,
+                ctx->picture_height_mb * 16);
+        ctx->dec_ctx.process_buffer = pnw_H264_process_buffer;
+    }
 
     if (psb_context_flush_cmdbuf(ctx->obj_context)) {
         return VA_STATUS_ERROR_UNKNOWN;
@@ -1750,17 +1795,6 @@ static VAStatus pnw_H264_EndPicture(
         free(ctx->iq_matrix);
         ctx->iq_matrix = NULL;
     }
-
-/*
-    obj_context->msvdx_rotate = 1;
-    driver_data->msvdx_rotate_want = 1;
-    if (CONTEXT_ROTATE(obj_context))
-    {
-        vld_dec_yuv_rotate(obj_context,
-                ctx->picture_width_mb * 16,
-                ctx->picture_height_mb * 16);
-    }
-*/
 
     return VA_STATUS_SUCCESS;
 }
