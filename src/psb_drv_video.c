@@ -506,8 +506,12 @@ VAStatus psb_CreateConfig(
     if (profile == VAProfileMPEG4Simple ||
         profile == VAProfileMPEG4AdvancedSimple ||
         profile == VAProfileMPEG4Main ||
-        profile == VAProfileVP8Version0_3)
-        driver_data->ec_enabled = 1;
+        profile == VAProfileVP8Version0_3 ||
+	profile == VAProfileH264Baseline ||
+	profile == VAProfileH264Main ||
+	profile == VAProfileH264High ||
+	profile == VAProfileH264ConstrainedBaseline)
+		driver_data->ec_enabled = 1;
 
 #else
     driver_data->ec_enabled = 0;
@@ -1041,6 +1045,9 @@ VAStatus psb_CreateContext(
     obj_context->video_crop.width = picture_width;
     obj_context->video_crop.height = picture_height;
     obj_context->msvdx_scaling = 0;
+#ifdef SLICE_HEADER_PARSING
+    obj_context->msvdx_frame_end = 0;
+#endif
     obj_context->scaling_width = 0;
     obj_context->scaling_height = 0;
     obj_context->render_targets = (VASurfaceID *) calloc(1, num_render_targets * sizeof(VASurfaceID));
@@ -1945,8 +1952,9 @@ VAStatus psb_DestroyBuffer(
     INIT_DRIVER_DATA
     VAStatus vaStatus = VA_STATUS_SUCCESS;
     object_buffer_p obj_buffer = BUFFER(buffer_id);
-    CHECK_BUFFER(obj_buffer);
-
+    if (NULL == obj_buffer) {
+        return vaStatus;
+    }
     psb__suspend_buffer(driver_data, obj_buffer);
     DEBUG_FUNC_EXIT
     return vaStatus;
@@ -2429,7 +2437,10 @@ VAStatus psb_QuerySurfaceError(
         arg.value = (uint64_t)((unsigned long)decode_status);
         ret = drmCommandWriteRead(driver_data->drm_fd, driver_data->getParamIoctlOffset,
                                   &arg, sizeof(arg));
-
+	if (ret != 0) {
+		drv_debug_msg(VIDEO_DEBUG_GENERAL,"return value is %d drmCommandWriteRead\n",ret);
+		return VA_STATUS_ERROR_UNKNOWN;
+	}
 #ifndef _FOR_FPGA_
         if (decode_status->num_region > MAX_MB_ERRORS) {
             drv_debug_msg(VIDEO_DEBUG_GENERAL, "too much mb errors are reported.\n");

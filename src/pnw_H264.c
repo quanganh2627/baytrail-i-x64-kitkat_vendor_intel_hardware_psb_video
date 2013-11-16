@@ -629,6 +629,9 @@ static VAStatus psb__H264_process_picture_param(context_H264_p ctx, object_buffe
     ctx->long_term_frame_flags = 0;
     /* We go from high to low so that we are left with the lowest index */
     for (i = pic_params->num_ref_frames; i--;) {
+        if (pic_params->ReferenceFrames[i].flags == VA_PICTURE_H264_INVALID) {
+            continue;
+        }
         object_surface_p ref_surface = SURFACE(pic_params->ReferenceFrames[i].picture_id);
         if (pic_params->ReferenceFrames[i].flags & VA_PICTURE_H264_BOTTOM_FIELD) {
             ctx->long_term_frame_flags |= 0x01 << i;
@@ -910,6 +913,9 @@ static void psb__H264_build_picture_order_chunk(context_H264_p ctx)
     }
 
     for (i = 0; i < pic_params->num_ref_frames; i++) {
+        if (pic_params->ReferenceFrames[i].flags == VA_PICTURE_H264_INVALID) {
+            continue;
+        }
         reg_value = 0;
         REGIO_WRITE_FIELD_LITE(reg_value, MSVDX_VEC_H264, CR_VEC_H264_BE_TOP_FOC, TOPFIELDORDERCNT,
                                SIGNTRUNC(pic_params->ReferenceFrames[i].TopFieldOrderCnt));
@@ -1160,7 +1166,7 @@ static void psb__H264_build_rendec_params(context_H264_p ctx, VASliceParameterBu
     /* CHUNK: DPB */
     /* send DPB information (for P and B slices?) only needed once per frame */
 //      if ( sh->slice_type == ST_B || sh->slice_type == ST_P )
-    if (pic_params->num_ref_frames > 0) {
+    if (pic_params->num_ref_frames > 0 && (slice_param->slice_type == ST_B || slice_param->slice_type == ST_P)) {
         IMG_BOOL is_used[16];
         psb_cmdbuf_rendec_start(cmdbuf, RENDEC_REGISTER_OFFSET(MSVDX_CMDS, REFERENCE_PICTURE_BASE_ADDRESSES));
 
@@ -1198,6 +1204,9 @@ static void psb__H264_build_rendec_params(context_H264_p ctx, VASliceParameterBu
             pic_params->num_ref_frames = 16;
         /* Only load used surfaces */
         for (i = 0; i < pic_params->num_ref_frames; i++) {
+            if (pic_params->ReferenceFrames[i].flags == VA_PICTURE_H264_INVALID) {
+                continue;
+            }
             object_surface_p ref_surface = SURFACE(pic_params->ReferenceFrames[i].picture_id);
             psb_buffer_p buffer;
 
@@ -1608,6 +1617,10 @@ static VAStatus pnw_H264_BeginPicture(
 {
     INIT_CONTEXT_H264
 
+#ifdef SLICE_HEADER_PARSING
+    obj_context->msvdx_frame_end = 0;
+#endif
+
     if (ctx->pic_params) {
         free(ctx->pic_params);
         ctx->pic_params = NULL;
@@ -1771,6 +1784,10 @@ static VAStatus pnw_H264_EndPicture(
             }
         }
     }
+#endif
+#ifdef SLICE_HEADER_PARSING
+    if (driver_data->protected)
+        obj_context->msvdx_frame_end = 1;
 #endif
 
     /* if scaling is enabled, rotate is not performed in 1st pass */
