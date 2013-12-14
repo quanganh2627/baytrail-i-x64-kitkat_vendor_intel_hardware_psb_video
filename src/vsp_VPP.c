@@ -42,7 +42,8 @@
 
 #define KB 1024
 #define MB (KB * KB)
-#define VSP_PROC_CONTEXT_SIZE (30*MB)
+#define VSP_CONTEXT_BUF_SIZE (60*KB)
+#define VSP_INTERMEDIATE_BUF_SIZE (29*MB)
 
 #define MAX_VPP_PARAM (100)
 #define MIN_VPP_PARAM (0)
@@ -315,14 +316,26 @@ static VAStatus vsp_VPP_CreateContext(
 	ctx->sharpen_param_offset = ctx->enhancer_param_offset + ctx->enhancer_param_sz;
 	ctx->frc_param_offset = ctx->sharpen_param_offset + ctx->sharpen_param_sz;
 
+	/* create context buffer */
 	ctx->context_buf = (psb_buffer_p) calloc(1, sizeof(struct psb_buffer_s));
 	if (NULL == ctx->context_buf) {
 		vaStatus = VA_STATUS_ERROR_ALLOCATION_FAILED;
 		DEBUG_FAILURE;
 		goto out;
 	}
+	vaStatus = psb_buffer_create(obj_context->driver_data, VSP_CONTEXT_BUF_SIZE, psb_bt_vpu_only, ctx->context_buf);
+	if (VA_STATUS_SUCCESS != vaStatus) {
+		goto out;
+	}
 
-	vaStatus = psb_buffer_create(obj_context->driver_data, VSP_PROC_CONTEXT_SIZE, psb_bt_vpu_only, ctx->context_buf);
+	/* create intermediate buffer */
+	ctx->intermediate_buf = (psb_buffer_p) calloc(1, sizeof(struct psb_buffer_s));
+	if (NULL == ctx->intermediate_buf) {
+		vaStatus = VA_STATUS_ERROR_ALLOCATION_FAILED;
+		DEBUG_FAILURE;
+		goto out;
+	}
+	vaStatus = psb_buffer_create(obj_context->driver_data, VSP_INTERMEDIATE_BUF_SIZE, psb_bt_vpu_only, ctx->intermediate_buf);
 	if (VA_STATUS_SUCCESS != vaStatus) {
 		goto out;
 	}
@@ -370,6 +383,13 @@ static void vsp_VPP_DestroyContext(
 
 		free(ctx->context_buf);
 		ctx->context_buf = NULL;
+	}
+
+	if (ctx->intermediate_buf) {
+		psb_buffer_destroy(ctx->intermediate_buf);
+
+		free(ctx->intermediate_buf);
+		ctx->intermediate_buf = NULL;
 	}
 
 	if (ctx->filters) {
@@ -673,7 +693,7 @@ static VAStatus vsp_VPP_BeginPicture(
 
 	if (ctx->obj_context->frame_count == 0) /* first picture */
 		vsp_cmdbuf_insert_command(cmdbuf, CONTEXT_VPP_ID, ctx->context_buf, VspSetContextCommand,
-					  0, VSP_PROC_CONTEXT_SIZE);
+					  0, VSP_CONTEXT_BUF_SIZE);
 
 	/* map param mem */
 	vaStatus = psb_buffer_map(&cmdbuf->param_mem, &cmdbuf->param_mem_p);
@@ -1157,8 +1177,7 @@ VAStatus vsp_QueryVideoProcPipelineCaps(
 				/* check frame rate */
 				ratio = frc->output_fps / (float)frc->input_fps;
 
-				/* Support 15/24/30->60, 25->62 */
-				if (!(ratio == 2 || ratio == 2.5 || ratio == 4 || ratio == (float)2.48)) {
+				if (!((ratio == 2 || ratio == 2.5 || ratio == 4) && frc->output_fps <= 60)) {
 					drv_debug_msg(VIDEO_DEBUG_ERROR, "The FRC do NOT support the ration(%f) and fps(%d)\n",
 						      ratio, frc->output_fps);
 					vaStatus = VA_STATUS_ERROR_UNSUPPORTED_FILTER;
@@ -1198,6 +1217,10 @@ static VAStatus vsp_set_pipeline(context_VPP_p ctx)
 	VAProcFilterParameterBufferBase *cur_param;
 	enum VssProcFilterType tmp;
 	psb_driver_data_p driver_data = ctx->obj_context->driver_data;
+
+	/* set intermediate buffer */
+	cell_pipeline_param->intermediate_buffer_size = VSP_INTERMEDIATE_BUF_SIZE;
+	cell_pipeline_param->intermediate_buffer_base = wsbmBOOffsetHint(ctx->intermediate_buf->drm_buf);
 
 	/* init pipeline cmd */
 	for (i = 0; i < VssProcPipelineMaxNumFilters; ++i)
@@ -1353,8 +1376,7 @@ static VAStatus vsp_set_filter_param(context_VPP_p ctx)
 			/* check if the input fps is in the range of HW capability */
 			if (ratio == 2)
 				cell_proc_frc_param->conversion_rate = VssFrc2xConversionRate;
-			/* Support 24->60, 25->62 */
-			else if (ratio == 2.5 || ratio == (float)2.48)
+			else if (ratio == 2.5)
 				cell_proc_frc_param->conversion_rate = VssFrc2_5xConversionRate;
 			else if (ratio == 4)
 				cell_proc_frc_param->conversion_rate = VssFrc4xConversionRate;
