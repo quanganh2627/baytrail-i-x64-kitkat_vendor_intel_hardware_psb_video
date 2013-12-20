@@ -85,7 +85,7 @@ void vld_dec_setup_alternative_frame(object_context_p obj_context)
         src_surface = ctx->yuv_ctx->src_surface;
     }
 
-    if (CONTEXT_ALTERNATIVE_OUTPUT(obj_context)) {
+    if (CONTEXT_ALTERNATIVE_OUTPUT(obj_context) || obj_context->entry_point == VAEntrypointVideoProc) {
         if (out_loop_surface == NULL) {
             drv_debug_msg(VIDEO_DEBUG_GENERAL, "out-loop surface is NULL, abort msvdx alternative output\n");
             return;
