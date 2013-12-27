@@ -414,21 +414,28 @@ void tng_cmdbuf_insert_command(
     *cmdbuf->cmd_idx++ = cmd_data;
 /* Command data address */
     if (data_addr) {
-        if ((cmd_id >= MTX_CMDID_SETQUANT) && (cmd_id <= MTX_CMDID_SETUP)) {
-            tng_cmdbuf_set_phys(cmdbuf->cmd_idx, 0, data_addr, offset, 0);
-        }
-        else {
+	if (cmd_id == MTX_CMDID_RC_UPDATE) {
+	    *cmdbuf->cmd_idx++ = data_addr;
+	    drv_debug_msg(VIDEO_DEBUG_GENERAL,
+		"%s: data_addr = 0x%08x\n",
+		__FUNCTION__, *(cmdbuf->cmd_idx));
+	} else {
+	    if ((cmd_id >= MTX_CMDID_SETQUANT) && (cmd_id <= MTX_CMDID_SETUP)) {
+		tng_cmdbuf_set_phys(cmdbuf->cmd_idx, 0, data_addr, offset, 0);
+	    }
+	    else {
 #ifdef _TNG_RELOC_
-            TNG_RELOC_CMDBUF_START(cmdbuf->cmd_idx, offset, data_addr);
+		TNG_RELOC_CMDBUF_START(cmdbuf->cmd_idx, offset, data_addr);
 #else
-            tng_cmdbuf_set_phys(cmdbuf->cmd_idx, 0, data_addr, offset, 0);
+		tng_cmdbuf_set_phys(cmdbuf->cmd_idx, 0, data_addr, offset, 0);
 #endif
-        }
-        drv_debug_msg(VIDEO_DEBUG_GENERAL,
-            "%s: data_addr = 0x%08x\n",
-            __FUNCTION__, *(cmdbuf->cmd_idx));
+	    }
+		drv_debug_msg(VIDEO_DEBUG_GENERAL,
+		    "%s: data_addr = 0x%08x\n",
+		    __FUNCTION__, *(cmdbuf->cmd_idx));
 
-        cmdbuf->cmd_idx++;
+		cmdbuf->cmd_idx++;
+	}
     } else {
         *cmdbuf->cmd_idx++ = 0;
     }
@@ -533,7 +540,7 @@ ptgDRMCmdBuf(int fd, int ioctl_offset, psb_buffer_p *buffer_list, int buffer_cou
         req->next = (unsigned long) & (arg_list[i+1]);
 
         req->buffer_handle = wsbmKBufHandle(wsbmKBuf(buffer_list[i]->drm_buf));
-        req->group = 0;
+        //req->group = 0;
         req->set_flags = (PSB_GPU_ACCESS_READ | PSB_GPU_ACCESS_WRITE) & mask;
         req->clear_flags = (~(PSB_GPU_ACCESS_READ | PSB_GPU_ACCESS_WRITE)) & mask;
 #if 1
