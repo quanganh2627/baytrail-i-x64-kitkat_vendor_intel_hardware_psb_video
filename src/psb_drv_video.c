@@ -57,7 +57,6 @@
 #include "pnw_VC1.h"
 #include "tng_jpegdec.h"
 #include "tng_VP8.h"
-
 #include "tng_yuv_processor.h"
 
 #ifdef PSBVIDEO_MFLD
@@ -1140,7 +1139,12 @@ VAStatus psb_CreateContext(
 #ifdef BAYTRAIL
             obj_context->msvdx_tile = psb__tile_stride_log2_512(obj_surface->width);
 #else
-            obj_context->msvdx_tile = psb__tile_stride_log2_256(obj_surface->width);
+            if (obj_config->entrypoint == VAEntrypointVideoProc && obj_config->profile == VAProfileNone)
+                // It's for two pass rotation case
+                // Need the source surface width for tile stride setting
+                obj_context->msvdx_tile = psb__tile_stride_log2_256(obj_context->picture_width);
+            else
+                obj_context->msvdx_tile = psb__tile_stride_log2_256(obj_surface->width);
 #endif
 #endif
 #if 0
@@ -2394,9 +2398,6 @@ VAStatus psb_QuerySurfaceStatus(
             buffer_handle_t handle = obj_surface->psb_surface->buf.handle;
             int display_status;
             int err;
-#ifdef BAYTRAIL
-            surface_status = VASurfaceReady;
-#else
             err = gralloc_getdisplaystatus(handle, &display_status);
             if (!err) {
                 if (display_status)
@@ -2406,7 +2407,7 @@ VAStatus psb_QuerySurfaceStatus(
             } else {
                 surface_status = VASurfaceReady;
             }
-#endif
+
             /* if not used by display, then check whether surface used by widi */
             if (surface_status == VASurfaceReady && obj_surface->share_info) {
                 if (obj_surface->share_info->renderStatus == 1) {
