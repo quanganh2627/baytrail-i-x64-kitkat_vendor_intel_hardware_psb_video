@@ -385,6 +385,7 @@ typedef struct _PsbSurfaceAttributeTPI {
 #define IS_MOFD(driver_data) ((driver_data->dev_id & 0xFFFC) == 0x1480)
 #define IS_LEXINGTON(driver_data) ((driver_data->dev_id & 0xFFFF) == 0x01FF)
 #define IS_BAYTRAIL(driver_data) ((driver_data->dev_id & 0xFFFF) == 0x0F31)
+#define IS_MOFD(driver_data) ((driver_data->dev_id & 0xFFFC) == 0x1480)
 #endif
 
 struct object_config_s {

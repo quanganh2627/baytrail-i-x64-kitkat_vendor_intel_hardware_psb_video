@@ -296,7 +296,7 @@ VAStatus psb_CreateSurfacesFromGralloc(
 
     /* get native window from the reserved field */
     driver_data->native_window = (void *)external_buffers->reserved[0];
-    
+
     for (i = 0; i < num_surfaces; i++) {
         int surfaceID;
         object_surface_p obj_surface;

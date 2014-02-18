@@ -53,6 +53,7 @@ LOCAL_SRC_FILES := \
 
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE := topazhp_bin
+LOCAL_MULTILIB := 32
 
 include $(BUILD_EXECUTABLE)
 

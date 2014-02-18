@@ -168,5 +168,6 @@ endif
 
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE := pvr_drv_video
+LOCAL_MULTILIB := 32
 
 include $(BUILD_SHARED_LIBRARY)

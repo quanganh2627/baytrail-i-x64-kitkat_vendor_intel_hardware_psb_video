@@ -42,6 +42,7 @@ LOCAL_SRC_FILES := \
 
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE := topaz_bin
+LOCAL_MULTILIB := 32
 
 include $(BUILD_EXECUTABLE)
 
@@ -52,6 +53,7 @@ include $(CLEAR_VARS)
 LOCAL_SRC_FILES := fwinfo.c
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE := imginfo
+LOCAL_MULTILIB := 32
 
 include $(BUILD_EXECUTABLE)
 
@@ -85,6 +87,7 @@ LOCAL_SRC_FILES := topazsc_bin.c \
 
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE := topazsc_bin
+LOCAL_MULTILIB := 32
 
 include $(BUILD_EXECUTABLE)
 
