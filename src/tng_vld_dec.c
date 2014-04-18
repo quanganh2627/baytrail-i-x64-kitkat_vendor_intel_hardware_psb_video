@@ -118,6 +118,11 @@ void vld_dec_setup_alternative_frame(object_context_p obj_context)
         REGIO_WRITE_FIELD_LITE(cmd, MSVDX_CMDS, ALTERNATIVE_OUTPUT_PICTURE_ROTATION , RECON_WRITE_DISABLE, 0); /* FIXME Always generate Rec */
         REGIO_WRITE_FIELD_LITE(cmd, MSVDX_CMDS, ALTERNATIVE_OUTPUT_PICTURE_ROTATION , ROTATION_MODE, GET_SURFACE_INFO_rotate(out_loop_surface));
 
+        if (out_loop_surface->stride_mode == STRIDE_NA) {
+            REGIO_WRITE_FIELD_LITE(cmd, MSVDX_CMDS, ALTERNATIVE_OUTPUT_PICTURE_ROTATION, USE_EXT_ROT_ROW_STRIDE, 1);
+            REGIO_WRITE_FIELD_LITE(cmd, MSVDX_CMDS, ALTERNATIVE_OUTPUT_PICTURE_ROTATION ,EXT_ROT_ROW_STRIDE, out_loop_surface->stride / 64);
+        }
+
         RELOC(*ctx->p_range_mapping_base0, out_loop_surface->buf.buffer_ofs, &out_loop_surface->buf);
         RELOC(*ctx->p_range_mapping_base1, out_loop_surface->buf.buffer_ofs + out_loop_surface->chroma_offset, &out_loop_surface->buf);
     }

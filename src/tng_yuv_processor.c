@@ -145,6 +145,9 @@ static void tng__yuv_processor_process(context_DEC_p dec_ctx)
     REGIO_WRITE_FIELD_LITE(reg_value, MSVDX_CMDS, OPERATING_MODE, CHROMA_FORMAT, 1);
     REGIO_WRITE_FIELD_LITE(reg_value, MSVDX_CMDS, OPERATING_MODE, ROW_STRIDE, src_surface->stride_mode);
 
+    if (src_surface->stride_mode == STRIDE_NA)
+        REGIO_WRITE_FIELD_LITE(reg_value, MSVDX_CMDS, OPERATING_MODE, USE_EXT_ROW_STRIDE, 1 );
+
     psb_cmdbuf_rendec_start(cmdbuf, RENDEC_REGISTER_OFFSET( MSVDX_CMDS, OPERATING_MODE ));
     psb_cmdbuf_rendec_write(cmdbuf, reg_value);
     psb_cmdbuf_rendec_end(cmdbuf);
