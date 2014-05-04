@@ -2697,6 +2697,7 @@ static void tng__setvideo_params(context_ENC_p ctx, IMG_UINT32 ui32StreamIndex)
     psMtxEncContext->b8FirstPic = IMG_TRUE;
 
     /*Contents Adaptive Rate Control Parameters*/
+    ctx->sCARCParams.bCARC          =  (ctx->sRCParams.u8Mb_rate_control == 1);
     psMtxEncContext->bCARC          =  ctx->sCARCParams.bCARC;
     psMtxEncContext->iCARCBaseline  =  ctx->sCARCParams.i32CARCBaseline;
     psMtxEncContext->uCARCThreshold =  ctx->sCARCParams.ui32CARCThreshold;

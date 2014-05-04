@@ -433,6 +433,7 @@ typedef struct _RC_PARAMS_ {
     IMG_BOOL    bScDetectDisable;
     IMG_BOOL    bDisableFrameSkipping;
     IMG_BOOL    bDisableBitStuffing;
+    IMG_UINT8   u8Mb_rate_control;
     IMG_RCMODE  eRCMode;
     IMG_UINT8   u8Slices;
     IMG_INT8    i8QCPOffset;
