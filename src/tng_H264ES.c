@@ -269,6 +269,15 @@ static VAStatus tng__H264ES_process_misc_ratecontrol_param(context_ENC_p ctx, ob
             ctx->sRCParams.u8Mb_rate_control = psMiscRcParams->rc_flags.bits.mb_rate_control;
         drv_debug_msg(VIDEO_DEBUG_GENERAL, "u8Mb_rate_control is %d\n",
             ctx->sRCParams.u8Mb_rate_control);
+
+        if (ctx->sRCParams.eRCVcmMode != IMG_RC_VCM_MODE_DEFAULT) {
+            if (psMiscRcParams->rc_flags.bits.cfs_I_frames)
+                ctx->sRCParams.eRCVcmMode = IMG_RC_VCM_MODE_CFS_ALLFRAMES;
+            else
+                ctx->sRCParams.eRCVcmMode = IMG_RC_VCM_MODE_CFS_NONIFRAMES;
+            drv_debug_msg(VIDEO_DEBUG_GENERAL, "eRCVcmMode is %d\n",
+                ctx->sRCParams.eRCVcmMode);
+        }
     }
 
     if (psMiscRcParams->window_size > 2000) {
@@ -1167,7 +1176,7 @@ static void tng_H264ES_QueryConfigAttributes(
             break;
 
         case VAConfigAttribRateControl:
-            attrib_list[i].value = VA_RC_NONE | VA_RC_CBR | VA_RC_VBR | VA_RC_VCM;
+            attrib_list[i].value = VA_RC_NONE | VA_RC_CBR | VA_RC_VBR | VA_RC_VCM | VA_RC_CFS;
             break;
 
         case VAConfigAttribEncAutoReference:

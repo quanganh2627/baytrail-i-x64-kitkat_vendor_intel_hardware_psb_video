@@ -409,6 +409,21 @@ typedef enum _IMG_RCMODE_ {
 } IMG_RCMODE;
 
 /*!
+ *****************************************************************************
+ *
+ * @details    Video Conferencing Mode (VCM) rate control method's sub modes
+ *
+ * @brief      VCM modes
+ *
+ ****************************************************************************/
+typedef enum _IMG_RC_VCM_MODE_
+{
+    IMG_RC_VCM_MODE_DEFAULT = 0,
+    IMG_RC_VCM_MODE_CFS_NONIFRAMES,
+    IMG_RC_VCM_MODE_CFS_ALLFRAMES,
+} IMG_RC_VCM_MODE;
+
+/*!
 *****************************************************************************
 @details    Struct describing rate control params
 @brief          Rate control parameters
@@ -435,6 +450,7 @@ typedef struct _RC_PARAMS_ {
     IMG_BOOL    bDisableBitStuffing;
     IMG_UINT8   u8Mb_rate_control;
     IMG_RCMODE  eRCMode;
+    IMG_RC_VCM_MODE eRCVcmMode;
     IMG_UINT8   u8Slices;
     IMG_INT8    i8QCPOffset;
 
@@ -848,6 +864,8 @@ typedef struct _IMG_FIRST_STAGE_MB_PARAMS {
 #define ISSCENE_DISABLED                     (0x00000100)
 #define ISMULTIREF_FLAGS                     (0x00000200)
 #define SPATIALDIRECT_FLAGS               (0x00000400)
+#define ISVCM_CFS_MODE_FLAGS                    (0x00000800)
+#define VCM_CFS_SUBMODE_FLAGS                   (0x00001000)
 /* @} */
 
 /*!

@@ -591,6 +591,10 @@ static VAStatus tng__init_rc_params(context_ENC_p ctx, object_config_p obj_confi
         ctx->sRCParams.eRCMode = IMG_RCMODE_VBR;
     } else if (eRCmode == VA_RC_VCM) {
         ctx->sRCParams.eRCMode = IMG_RCMODE_VCM;
+        ctx->sRCParams.eRCVcmMode = IMG_RC_VCM_MODE_DEFAULT;
+    } else if (eRCmode == VA_RC_CFS) {
+        ctx->sRCParams.eRCMode = IMG_RCMODE_VCM;
+        ctx->sRCParams.eRCVcmMode = IMG_RC_VCM_MODE_CFS_NONIFRAMES;
     } else {
         ctx->sRCParams.bRCEnable = IMG_FALSE;
         drv_debug_msg(VIDEO_DEBUG_ERROR, "not support this RT Format\n");
@@ -1600,6 +1604,11 @@ static void tng__setup_rcdata(context_ENC_p ctx)
 
                 if (ctx->sRCParams.eRCMode == IMG_RCMODE_VCM) {
                     psPicParams->sInParams.i32BufferSize = i32BufferSizeInFrames;
+                    if (psRCParams->eRCVcmMode != IMG_RC_VCM_MODE_DEFAULT) {
+                        psPicParams->ui32Flags |= ISVCM_CFS_MODE_FLAGS;
+                        if (psRCParams->eRCVcmMode == IMG_RC_VCM_MODE_CFS_ALLFRAMES)
+                            psPicParams->ui32Flags |= VCM_CFS_SUBMODE_FLAGS;
+                    }
                 }
                 break;
             case IMG_STANDARD_MPEG4:
