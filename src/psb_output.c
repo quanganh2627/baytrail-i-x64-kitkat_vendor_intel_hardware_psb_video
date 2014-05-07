@@ -2106,7 +2106,7 @@ VAStatus psb_SetDisplayAttributes(
 
     VADisplayAttribute *p = attr_list;
     int i, update_coeffs = 0;
-    unsigned int *p_tmp;
+    float *p_tmp;
 
     if (num_attributes <= 0) {
         return VA_STATUS_ERROR_INVALID_PARAMETER;
@@ -2155,13 +2155,32 @@ VAStatus psb_SetDisplayAttributes(
 
         case VADisplayAttribCSCMatrix:
             driver_data->load_csc_matrix = 1;
-            p_tmp = (unsigned int *)p->value;
+            p_tmp = (float *)(p->attrib_ptr);
             for (j = 0; j < CSC_MATRIX_Y; j++)
                 for (k = 0; k < CSC_MATRIX_X; k++) {
                     if (p_tmp)
                         driver_data->csc_matrix[j][k] = *p_tmp;
                    p_tmp++; 
                 }
+
+            for (j = 0; j < CSC_MATRIX_Y; j++)
+                for (k = 0; k < CSC_MATRIX_X; k++) {
+                    if (fabs(s601[j*CSC_MATRIX_X+k] - driver_data->csc_matrix[j][k]) > 1e-6) {
+                        break;
+                    }
+                    if (k < CSC_MATRIX_X) {
+                        break;
+                    }
+                }
+
+            if (j == CSC_MATRIX_Y && k == CSC_MATRIX_X) {
+                driver_data->is_BT601 = 1;
+            }
+            break;
+
+        case VADisplayAttribColorRange:
+            driver_data->set_video_range = 1;
+            driver_data->video_range = (p->value == VA_SOURCE_RANGE_FULL);
             break;
 
         case VADisplayAttribBlendColor:
@@ -2191,10 +2210,10 @@ VAStatus psb_SetDisplayAttributes(
             driver_data->render_mode = p->value & VA_RENDER_MODE_MASK;
             break;
         case VADisplayAttribRenderRect:
-            driver_data->render_rect.x = ((VARectangle *)(p->value))->x;
-            driver_data->render_rect.y = ((VARectangle *)(p->value))->y;
-            driver_data->render_rect.width = ((VARectangle *)(p->value))->width;
-            driver_data->render_rect.height = ((VARectangle *)(p->value))->height;
+            driver_data->render_rect.x = ((VARectangle *)(p->attrib_ptr))->x;
+            driver_data->render_rect.y = ((VARectangle *)(p->attrib_ptr))->y;
+            driver_data->render_rect.width = ((VARectangle *)(p->attrib_ptr))->width;
+            driver_data->render_rect.height = ((VARectangle *)(p->attrib_ptr))->height;
             break;
 
         default:
