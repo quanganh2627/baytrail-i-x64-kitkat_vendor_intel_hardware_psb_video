@@ -1445,7 +1445,10 @@ static VAStatus psb__allocate_BO_buffer(psb_driver_data_p driver_data, object_co
             }
 #endif
             else if (obj_buffer->type == VAEncCodedBufferType)
-                vaStatus = psb_buffer_create(driver_data, size, psb_bt_cpu_vpu, obj_buffer->psb_buffer);
+                if (psb_video_debug_option & CLFLUSH_DEBUG_CODED)
+                    vaStatus = psb_buffer_create(driver_data, size, psb_bt_cpu_vpu_cached, obj_buffer->psb_buffer);
+                else
+                    vaStatus = psb_buffer_create(driver_data, size, psb_bt_cpu_vpu, obj_buffer->psb_buffer);
             else
                 vaStatus = psb_buffer_create(driver_data, size, psb_bt_cpu_vpu, obj_buffer->psb_buffer);
 

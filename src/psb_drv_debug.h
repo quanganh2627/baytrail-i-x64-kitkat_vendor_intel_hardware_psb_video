@@ -91,10 +91,13 @@ typedef enum
  ****************************/
 typedef enum
 {
-    TIME_DEBUG		=   0x1,
+    TIME_DEBUG      =   0x1,
     THREAD_DEBUG    =   0x2,
-    PRINT_TO_LOGCAT	=   0x10,
+    PRINT_TO_LOGCAT =   0x10,
     PRINT_TO_FILE   =   0x20,
+
+    CLFLUSH_DEBUG_SOURCE = 0x100,
+    CLFLUSH_DEBUG_CODED  = 0x200
 } DEBUG_TRACE_OPTION;
 
 FILE *psb_video_debug_fp;
