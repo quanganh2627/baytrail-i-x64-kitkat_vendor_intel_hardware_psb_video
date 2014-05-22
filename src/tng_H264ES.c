@@ -214,7 +214,6 @@ static VAStatus tng__H264ES_process_misc_framerate_param(context_ENC_p ctx, obje
 		psRCParams->ui32BitsPerSecond /= (float)psMiscFrameRateParam->framerate / psRCParams->ui32FrameRate;
 	    else
 		psRCParams->ui32BitsPerSecond *= (float)psRCParams->ui32FrameRate / psMiscFrameRateParam->framerate;
-            psRCParams->ui32FrameRate = psMiscFrameRateParam->framerate;
             ctx->rc_update_flag |= RC_MASK_frame_rate;
         }
     }
