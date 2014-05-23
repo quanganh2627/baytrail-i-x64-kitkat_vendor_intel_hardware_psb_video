@@ -33,6 +33,7 @@
 
 #include <va/va_backend.h>
 #include <va/va.h>
+#include <va/va_tpi.h>
 
 #include <va/va_vpp.h>
 
@@ -343,6 +344,25 @@ struct psb_driver_data_s {
     int protected;
 };
 
+typedef struct _PsbSurfaceAttributeTPI {
+    VASurfaceMemoryType type;
+    unsigned int width;
+    unsigned int height;
+    unsigned int size;
+    unsigned int pixel_format; /* buffer format */
+    unsigned int tiling; /* the memory is tiling or not */
+    unsigned int luma_stride; /* luma stride, could be width aligned with a special value */
+    unsigned int chroma_u_stride; /* chroma stride */
+    unsigned int chroma_v_stride;
+    unsigned int luma_offset; /* could be 0 */
+    unsigned int chroma_u_offset; /* U offset from the beginning of the memory */
+    unsigned int chroma_v_offset; /* V offset from the beginning of the memory */
+    unsigned int count; /* buffer count for surface creation */
+    unsigned long *buffers; /* buffer handles or user pointers */
+    unsigned long reserved[4]; /* used to pass additional information, like
+                               * Android native window pointer
+                               */
+} PsbSurfaceAttributeTPI;
 
 #ifdef _FOR_FPGA_
 #define IS_CTP(driver_data)  0

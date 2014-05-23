@@ -89,7 +89,7 @@ VAStatus psb_CreateSurfacesFromGralloc(
     int format,
     int num_surfaces,
     VASurfaceID *surface_list,        /* out */
-    VASurfaceAttributeTPI *attribute_tpi
+    PsbSurfaceAttributeTPI *attribute_tpi
 )
 {
     INIT_DRIVER_DATA
@@ -97,7 +97,7 @@ VAStatus psb_CreateSurfacesFromGralloc(
     int i, height_origin, usage, buffer_stride = 0;
     int protected = (VA_RT_FORMAT_PROTECTED & format);
     unsigned long fourcc;
-    VASurfaceAttributeTPI *external_buffers = NULL;
+    PsbSurfaceAttributeTPI *external_buffers = NULL;
     unsigned long handle;
     int size = num_surfaces * sizeof(unsigned int);
     void *vaddr;
@@ -242,7 +242,7 @@ VAStatus psb_CreateSurfacesFromGralloc(
     int format,
     int num_surfaces,
     VASurfaceID *surface_list,        /* out */
-    VASurfaceAttributeTPI *attribute_tpi
+    PsbSurfaceAttributeTPI *attribute_tpi
 )
 {
     INIT_DRIVER_DATA
@@ -250,7 +250,7 @@ VAStatus psb_CreateSurfacesFromGralloc(
     int i, height_origin, usage, buffer_stride = 0;
     int protected = (VA_RT_FORMAT_PROTECTED & format);
     unsigned long fourcc;
-    VASurfaceAttributeTPI *external_buffers = NULL;
+    PsbSurfaceAttributeTPI *external_buffers = NULL;
     unsigned long handle;
     int size = num_surfaces * sizeof(unsigned int);
     void *vaddr[GRALLOC_SUB_BUFFER_MAX];
@@ -385,6 +385,9 @@ VAStatus psb_CreateSurfacesFromGralloc(
                 obj_surface->share_info->renderStatus = 0;
                 obj_surface->share_info->used_by_widi = 0;
                 obj_surface->share_info->native_window = (void *)external_buffers->reserved[0];
+
+                // send out share info via PsbSurfaceAttributeTPI so that share info can be filled                // out outside vaCreateSurface()
+                attribute_tpi->reserved[1] = (unsigned long)obj_surface->share_info;
 
                 // overlay only support BT.601 and BT.709
                 if (driver_data->load_csc_matrix == 1) {
