@@ -434,6 +434,7 @@ typedef struct _RC_PARAMS_ {
     IMG_UINT32  ui32InitialQp;      //!< Initial QP (only field used by JPEG)
     IMG_UINT32  ui32BUSize;         //!< Basic unit size
     IMG_UINT32  ui32FrameRate;
+    IMG_UINT32  ui32InitialFrameRate;
     IMG_UINT32  ui32BufferSize;
     IMG_UINT32  ui32IntraFreq;
     IMG_UINT32  ui32SliceByteLimit;

@@ -3424,12 +3424,12 @@ static VAStatus tng__update_ratecontrol(context_ENC_p ctx, IMG_UINT32 ui32Stream
         psRCParams->iMinQP, ctx->max_qp, psRCParams->ui32InitialQp);
 
     if (ctx->rc_update_flag & RC_MASK_frame_rate) {
-	tng__rc_update(ctx, psRCParams->ui32BitsPerSecond, -1, -1, -1, -1);
+	tng__rc_update(ctx, psRCParams->ui32InitialFrameRate*psRCParams->ui32BitsPerSecond/psRCParams->ui32FrameRate, -1, -1, -1, -1);
 	ctx->rc_update_flag &= ~RC_MASK_frame_rate;
     }
 
     if (ctx->rc_update_flag & RC_MASK_bits_per_second) {
-	tng__rc_update(ctx, psRCParams->ui32BitsPerSecond, -1, -1, -1, -1);
+	tng__rc_update(ctx, psRCParams->ui32InitialFrameRate*psRCParams->ui32BitsPerSecond/psRCParams->ui32FrameRate, -1, -1, -1, -1);
 	ctx->rc_update_flag &= ~RC_MASK_bits_per_second;
     }
 
