@@ -1821,12 +1821,20 @@ static VAStatus pnw_H264_EndPicture(
 #endif
 
     /* if scaling is enabled, rotate is not performed in 1st pass */
+    if (psb_context_flush_cmdbuf(ctx->obj_context)) {
+        return VA_STATUS_ERROR_UNKNOWN;
+    }
+
     if (CONTEXT_ROTATE(obj_context) && CONTEXT_SCALING(obj_context))
     {
-        vld_dec_yuv_rotate(obj_context,
-                ctx->picture_width_mb * 16,
-                ctx->picture_height_mb * 16);
+        CONTEXT_SCALING(obj_context) = 0;
+        vld_dec_yuv_rotate(obj_context);
+        CONTEXT_SCALING(obj_context) = 1;
         ctx->dec_ctx.process_buffer = pnw_H264_process_buffer;
+
+        if (psb_context_flush_cmdbuf(ctx->obj_context)) {
+            return VA_STATUS_ERROR_UNKNOWN;
+        }
     }
 
     if (psb_context_flush_cmdbuf(ctx->obj_context)) {
