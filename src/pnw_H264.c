@@ -162,6 +162,9 @@ struct context_H264_s {
     uint32_t long_term_frame_flags;
     uint32_t two_pass_mode;
     uint32_t deblock_mode;
+    unsigned short mb_consecutive;
+    int vdeb_pass_through;
+
     uint32_t slice_count;
 
     /* Registers */
@@ -420,21 +423,26 @@ static VAStatus pnw_H264_CreateContext(
     ctx->dec_ctx.end_slice = psb__H264_end_slice;
     ctx->dec_ctx.process_buffer = pnw_H264_process_buffer;
 
+    ctx->vdeb_pass_through = 0;
+
     switch (obj_config->profile) {
     case VAProfileH264Baseline:
         ctx->profile = H264_BASELINE_PROFILE;
         ctx->profile_idc = 0;
+        ctx->mb_consecutive = 0;
         break;
 
     case VAProfileH264Main:
         ctx->profile = H264_MAIN_PROFILE;
         ctx->profile_idc = 1;
+        ctx->mb_consecutive = 1;
         break;
 
     case VAProfileH264High:
     case VAProfileH264ConstrainedBaseline:
         ctx->profile = H264_HIGH_PROFILE;
         ctx->profile_idc = 3;
+        ctx->mb_consecutive = 1;
         break;
 
     default:
@@ -644,7 +652,8 @@ static VAStatus psb__H264_process_picture_param(context_H264_p ctx, object_buffe
     }
 
     /* If the MB are not guarenteed to be consecutive - we must do a 2pass */
-    ctx->two_pass_mode = (pic_params->num_slice_groups_minus1 > 0) && (!ctx->pic_params->seq_fields.bits.mb_adaptive_frame_field_flag);
+    ctx->two_pass_mode = (!ctx->mb_consecutive) && (!ctx->pic_params->seq_fields.bits.mb_adaptive_frame_field_flag);
+    ctx->vdeb_pass_through = ctx->two_pass_mode && (!ctx->pic_params->seq_fields.bits.mb_adaptive_frame_field_flag);
 
     ctx->reg_SPS0 = 0;
     REGIO_WRITE_FIELD_LITE(ctx->reg_SPS0, MSVDX_VEC_H264, CR_VEC_H264_BE_SPS0, H264_BE_SPS0_DEFAULT_MATRIX_FLAG, (ctx->profile == H264_BASELINE_PROFILE));    /* Always use suplied matrix non baseline otherwise use default*/
@@ -1373,7 +1382,7 @@ static void psb__H264_build_rendec_params(context_H264_p ctx, VASliceParameterBu
     REGIO_WRITE_FIELD_LITE(reg_value, MSVDX_CMDS, OPERATING_MODE, ROW_STRIDE, target_surface->stride_mode);
     REGIO_WRITE_FIELD_LITE(reg_value, MSVDX_CMDS, OPERATING_MODE, CODEC_PROFILE, ctx->profile);
     REGIO_WRITE_FIELD_LITE(reg_value, MSVDX_CMDS, OPERATING_MODE, CODEC_MODE, 1);       /* H.264 */
-    REGIO_WRITE_FIELD_LITE(reg_value, MSVDX_CMDS, OPERATING_MODE, ASYNC_MODE, (ctx->two_pass_mode && !ctx->pic_params->seq_fields.bits.mb_adaptive_frame_field_flag));
+    REGIO_WRITE_FIELD_LITE(reg_value, MSVDX_CMDS, OPERATING_MODE, ASYNC_MODE, (ctx->vdeb_pass_through));
     REGIO_WRITE_FIELD_LITE(reg_value, MSVDX_CMDS, OPERATING_MODE, CHROMA_FORMAT, pic_params->seq_fields.bits.chroma_format_idc);
     psb_cmdbuf_rendec_write(cmdbuf, reg_value);
 
@@ -1489,10 +1498,11 @@ static void psb__H264_preprocess_slice(context_H264_p ctx,
 
     IMG_BOOL deblocker_disable = (slice_param->disable_deblocking_filter_idc  == 1);
 
-    if (deblocker_disable) {
+    if (deblocker_disable || ctx->obj_context->is_oold) {
         if (ctx->obj_context->is_oold) {
             ctx->deblock_mode = DEBLOCK_INTRA_OOLD;
             ctx->two_pass_mode = 1;
+            ctx->vdeb_pass_through = 1;
             REGIO_WRITE_FIELD_LITE(ctx->reg_SPS0, MSVDX_VEC_H264, CR_VEC_H264_BE_SPS0, H264_BE_SPS0_2PASS_FLAG, ctx->two_pass_mode);
         } else
             ctx->deblock_mode = DEBLOCK_STD;
@@ -1722,6 +1732,7 @@ static VAStatus pnw_H264_EndPicture(
         drv_debug_msg(VIDEO_DEBUG_GENERAL, "pnw_H264_EndPicture got two pass mode frame\n");
         CHECK_BUFFER(colocated_target_buffer);
         if (CONTEXT_ROTATE(ctx->obj_context)) {
+            drv_debug_msg(VIDEO_DEBUG_GENERAL, "two pass deblock + rotation");
             ASSERT(rotate_surface);
             REGIO_WRITE_FIELD_LITE(rotation_flags, MSVDX_CMDS, ALTERNATIVE_OUTPUT_PICTURE_ROTATION , ALT_PICTURE_ENABLE, 1);
             REGIO_WRITE_FIELD_LITE(rotation_flags, MSVDX_CMDS, ALTERNATIVE_OUTPUT_PICTURE_ROTATION , ROTATION_ROW_STRIDE, rotate_surface->stride_mode);
@@ -1733,7 +1744,14 @@ static VAStatus pnw_H264_EndPicture(
 
         /* Issue two pass deblock cmd, HW can handle deblock instead of host when using DE2.x firmware */
         if (ctx->deblock_mode == DEBLOCK_STD) {
-            if (psb_context_submit_hw_deblock(ctx->obj_context,
+            int fmo = (ctx->pic_params->num_slice_groups_minus1 >= 1);
+            if ((ctx->slice_count == 1) && (fmo == 0)) {
+                drv_debug_msg(VIDEO_DEBUG_GENERAL, "Only one slice and fmo is false, no need two pass deblock\n");
+                ctx->obj_context->flags &= ~FW_VA_RENDER_IS_TWO_PASS_DEBLOCK;
+                REGIO_WRITE_FIELD(ctx->obj_context->operating_mode, MSVDX_CMDS, OPERATING_MODE, ASYNC_MODE, 0 );
+                /* if there is rotation, need to set FW_DEVA_FORCE_ALT_OUTPUT to generate rotation buffer */
+            }
+            else if (psb_context_submit_hw_deblock(ctx->obj_context,
                                               &target_surface->buf,
                                               rotate_surface ? (&rotate_surface->buf) : NULL,
                                               colocated_target_buffer,
@@ -1782,7 +1800,7 @@ static VAStatus pnw_H264_EndPicture(
 
 #ifdef PSBVIDEO_MSVDX_EC
     /* Sent the HOST_BE_OPP command to detect slice error */
-    if (driver_data->ec_enabled) {
+    if (driver_data->ec_enabled && ctx->mb_consecutive) {
         uint32_t rotation_flags = 0;
         uint32_t ext_stride_a = 0;
         object_surface_p ec_target;
