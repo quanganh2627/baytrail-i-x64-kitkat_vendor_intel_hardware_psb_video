@@ -343,6 +343,8 @@ VAStatus psb_CreateSurfacesFromGralloc(
 #endif
         /*hard code the gralloc buffer usage*/
         usage = GRALLOC_USAGE_HW_TEXTURE | GRALLOC_USAGE_HW_COMPOSER;
+        /* usage hack to force pages alloc and CPU/GPU cache flush */
+        usage |= GRALLOC_USAGE_HW_VIDEO_ENCODER;
 
         if (gfx_colorformat == HAL_PIXEL_FORMAT_NV12)
             usage |= GRALLOC_USAGE_SW_READ_OFTEN;
