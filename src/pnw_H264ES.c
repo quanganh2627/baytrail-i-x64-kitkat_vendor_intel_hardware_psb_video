@@ -845,7 +845,7 @@ static VAStatus pnw__convert_sliceparameter_buffer(VAEncSliceParameterBufferH264
 static VAStatus pnw__H264ES_process_slice_param(context_ENC_p ctx, object_buffer_p obj_buffer)
 {
     /* Prepare InParams for macros of current slice, insert slice header, insert do slice command */
-    VAEncSliceParameterBuffer *pBuf_per_core, *pBuffer;
+    VAEncSliceParameterBuffer *pBuf_per_core, *pBuffer, *pBufferSave = NULL;
     pnw_cmdbuf_p cmdbuf = ctx->obj_context->pnw_cmdbuf;
     PIC_PARAMS *psPicParams = (PIC_PARAMS *)(cmdbuf->pic_params_p);
     unsigned int i, j, slice_per_core;
@@ -870,6 +870,7 @@ static VAStatus pnw__H264ES_process_slice_param(context_ENC_p ctx, object_buffer
             vaStatus = VA_STATUS_ERROR_ALLOCATION_FAILED;
             goto out2;
         }
+        pBufferSave = pBuffer;
 
         pnw__convert_sliceparameter_buffer((VAEncSliceParameterBufferH264 *)obj_buffer->buffer_data,
                                            pBuffer,
@@ -886,7 +887,6 @@ static VAStatus pnw__H264ES_process_slice_param(context_ENC_p ctx, object_buffer
         goto out2;
     }
 
-    obj_buffer->size = 0;
 
     /*In case the slice number changes*/
     if ((ctx->slice_param_cache != NULL) && (obj_buffer->num_elements != ctx->slice_param_num)) {
@@ -905,8 +905,10 @@ static VAStatus pnw__H264ES_process_slice_param(context_ENC_p ctx, object_buffer
             drv_debug_msg(VIDEO_DEBUG_ERROR, "Run out of memory!\n");
 
             /* free the converted VAEncSliceParameterBuffer */
-            if (obj_buffer->size == sizeof(VAEncSliceParameterBufferH264))
+            if (obj_buffer->size == sizeof(VAEncSliceParameterBufferH264)) {
                 free(pBuffer);
+                obj_buffer->size = 0;
+            }
             free(obj_buffer->buffer_data);
             return VA_STATUS_ERROR_ALLOCATION_FAILED;
         }
@@ -964,12 +966,13 @@ static VAStatus pnw__H264ES_process_slice_param(context_ENC_p ctx, object_buffer
     }
 out1:
     /* free the converted VAEncSliceParameterBuffer */
-    if (obj_buffer->size == sizeof(VAEncSliceParameterBufferH264))
-        free(pBuffer);
+    if (obj_buffer->size == sizeof(VAEncSliceParameterBufferH264) && (pBufferSave != NULL))
+        free(pBufferSave);
 
 out2:
     free(obj_buffer->buffer_data);
     obj_buffer->buffer_data = NULL;
+    obj_buffer->size = 0;
 
     return vaStatus;
 }
