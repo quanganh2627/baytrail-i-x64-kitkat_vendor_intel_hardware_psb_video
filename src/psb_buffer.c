@@ -660,11 +660,6 @@ int psb_codedbuf_map_mangle(
                     /* partitions are concatenate */
                     p->buf = t->coded_data;
                     p->size = t->frame_size;
-                    if(t->frame_size == 0){
-                        drv_debug_msg(VIDEO_DEBUG_ERROR,"Frame size is zero, Force it to 3, encoder status is 0x%x\n", t->status);
-                        p->size = 3;
-                        t->coded_data[0]=0;
-                    }
                     p->next = NULL;
 		} else {
                     for (i = 0; i < t->partitions; i++) {
