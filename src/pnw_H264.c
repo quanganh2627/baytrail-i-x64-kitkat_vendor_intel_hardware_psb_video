@@ -1453,7 +1453,9 @@ static void psb__H264_build_rendec_params(context_H264_p ctx, VASliceParameterBu
     /*          If this a two pass mode deblock, then we will perform the rotation as part of the
      *          2nd pass deblock procedure
      */
-    if (!ctx->two_pass_mode)
+
+    int fmo = (ctx->pic_params->num_slice_groups_minus1 >= 1);
+    if (!ctx->two_pass_mode || !fmo)
         vld_dec_setup_alternative_frame(ctx->obj_context);
 }
 
@@ -1745,7 +1747,8 @@ static VAStatus pnw_H264_EndPicture(
         /* Issue two pass deblock cmd, HW can handle deblock instead of host when using DE2.x firmware */
         if (ctx->deblock_mode == DEBLOCK_STD) {
             int fmo = (ctx->pic_params->num_slice_groups_minus1 >= 1);
-            if ((ctx->slice_count == 1) && (fmo == 0)) {
+            /* if ((ctx->slice_count == 1) && (fmo == 0)) { */
+            if (fmo == 0) {
                 drv_debug_msg(VIDEO_DEBUG_GENERAL, "Only one slice and fmo is false, no need two pass deblock\n");
                 ctx->obj_context->flags &= ~FW_VA_RENDER_IS_TWO_PASS_DEBLOCK;
                 REGIO_WRITE_FIELD(ctx->obj_context->operating_mode, MSVDX_CMDS, OPERATING_MODE, ASYNC_MODE, 0 );
