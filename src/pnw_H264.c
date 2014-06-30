@@ -1803,7 +1803,7 @@ static VAStatus pnw_H264_EndPicture(
 
 #ifdef PSBVIDEO_MSVDX_EC
     /* Sent the HOST_BE_OPP command to detect slice error */
-    if (driver_data->ec_enabled && ctx->mb_consecutive) {
+    if (driver_data->ec_enabled) {
         uint32_t rotation_flags = 0;
         uint32_t ext_stride_a = 0;
         object_surface_p ec_target;
