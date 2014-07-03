@@ -661,6 +661,13 @@ int psb_codedbuf_map_mangle(
                     p->buf = t->coded_data;
                     p->size = t->frame_size;
                     p->next = NULL;
+
+                    if(t->status & 0x40) //crup_frame
+                        t->reserved[0] = 4; //frame is already dropped
+                    else
+                        t->reserved[0] = t->frame_flags;
+
+                    t->reserved[1] = t->quantizer[0];
 		} else {
                     for (i = 0; i < t->partitions; i++) {
                         /* partition not consecutive */

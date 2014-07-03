@@ -54,6 +54,7 @@
 
 #define VP8_ENC_CBR 0
 #define VP8_ENC_CBR_HRD 1
+#define VP8_ENC_SMOOTH_CBR_HRD 2
 
 #define XMEM_FRAME_BUFFER_SIZE_IN_BYTE ((REF_FRAME_WIDTH + 2 * REF_FRAME_BORDER) * (REF_FRAME_HEIGHT + 2 * REF_FRAME_BORDER) + \
         2 * ((REF_FRAME_WIDTH + 2 * REF_FRAME_BORDER) >> 1) * (REF_FRAME_HEIGHT / 2 + REF_FRAME_BORDER)) // Allocated for HD
@@ -189,9 +190,11 @@ void vsp_VP8_set_default_params(struct VssVp8encSequenceParameterBuffer *vp8_seq
     vp8_seq->recon_buffer_mode = vss_vp8enc_seq_param_recon_buffer_mode_per_seq;
     vp8_seq->ts_number_layers = 1;
     vp8_seq->ts_layer_id[0] = 0;
-    vp8_seq->ts_rate_decimator[0] = 0;
-    vp8_seq->ts_periodicity = 0;
-    vp8_seq->ts_target_bitrate[0] = 0;
+    vp8_seq->ts_rate_decimator[0] = 1;
+    vp8_seq->ts_periodicity = 1;
+    vp8_seq->ts_target_bitrate[0] = 2000;
+    vp8_seq->generate_skip_frames = 0;
+    vp8_seq->max_num_dropped_frames = 0;
 }
 
 static VAStatus vsp_VP8_CreateContext(
@@ -217,7 +220,7 @@ static VAStatus vsp_VP8_CreateContext(
     for (i = 0; i < obj_config->attrib_count; i++) {
         if (obj_config->attrib_list[i].type == VAConfigAttribRateControl) {
             if (obj_config->attrib_list[i].value == VA_RC_VCM)
-               ctx->vp8_seq_param.rc_end_usage = VP8_ENC_CBR_HRD;
+               ctx->vp8_seq_param.rc_end_usage = VP8_ENC_SMOOTH_CBR_HRD;
             else
                ctx->vp8_seq_param.rc_end_usage = VP8_ENC_CBR;
         }
@@ -616,6 +619,12 @@ static VAStatus vsp_vp8_process_misc_param(context_VPP_p ctx, object_buffer_p ob
             seq->rc_undershoot_pct = rate_control_param->target_percentage;
         }
 
+	if (rate_control_param->max_num_of_consecutive_drop_frames != seq->max_num_dropped_frames) {
+		drv_debug_msg(VIDEO_DEBUG_ERROR, "max_num_of_consecutive_drop_frames was changed from %d to %d\n",
+				seq->max_num_dropped_frames, rate_control_param->max_num_of_consecutive_drop_frames);
+		seq->max_num_dropped_frames = rate_control_param->max_num_of_consecutive_drop_frames;
+	}
+
         if (ctx->temporal_layer_number == 1) {
             if (rate_control_param->bits_per_second / 1000 != seq->rc_target_bitrate) {
                 drv_debug_msg(VIDEO_DEBUG_ERROR, "bitrate was changed from %dkbps to %dkbps\n",
@@ -823,6 +832,8 @@ static void vsp_vp8_dump_commands(vsp_cmdbuf_p cmdbuf)
             drv_debug_msg(VIDEO_ENCODE_DEBUG, "concatenate_partitions %d\n", seq->concatenate_partitions);
             drv_debug_msg(VIDEO_ENCODE_DEBUG, "recon_buffer_mode %d\n", seq->recon_buffer_mode);
             drv_debug_msg(VIDEO_ENCODE_DEBUG, "ts_number_layers %d\n", seq->ts_number_layers);
+            drv_debug_msg(VIDEO_ENCODE_DEBUG, "generate_skip_frames %d\n", seq->generate_skip_frames);
+            drv_debug_msg(VIDEO_ENCODE_DEBUG, "max_num_dropped_frames %d\n", seq->max_num_dropped_frames);
 
             for (i = 0; i < 3; i++)
                 drv_debug_msg(VIDEO_ENCODE_DEBUG, "ts_target_bitrate[%d] %d\n", i, seq->ts_target_bitrate[i]);
