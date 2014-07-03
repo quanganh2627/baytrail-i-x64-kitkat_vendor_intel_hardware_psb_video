@@ -267,7 +267,7 @@ void psb_RecalcAlternativeOutput(object_context_p obj_context)
     driver_data->extend_rotation = Angle2Rotation(angle);
 
     /* On MOFD, no need to use meta rotation, just use rotation angle signal from HWC */
-    if (IS_MOFD(driver_data)) {
+    if (IS_MOFD(driver_data) && (mode == INIT_VALUE)) {
         driver_data->local_rotation = driver_data->mipi0_rotation;
         driver_data->extend_rotation = Rotation2Angle(driver_data->hdmi_rotation);
     }
@@ -301,7 +301,12 @@ void psb_RecalcAlternativeOutput(object_context_p obj_context)
     int scaling_buffer_width = 1920, scaling_buffer_height = 1080 ;
     int scaling_width = 0, scaling_height = 0;
     int scaling_offset_x = 0, scaling_offset_y = 0;
-    int old_bufw = 0, old_bufh = 0, old_x = 0, old_y = 0, old_w = 0, old_h = 0;
+    int old_bufw = obj_context->scaling_buffer_width;
+    int old_bufh = obj_context->scaling_buffer_height;
+    int old_x = obj_context->scaling_offset_x;
+    int old_y = obj_context->scaling_offset_y;
+    int old_w = obj_context->scaling_width;
+    int old_h = obj_context->scaling_height;
     int bScaleChanged = 0, size = 0;
     unsigned char * surface_data;
 
@@ -311,23 +316,10 @@ void psb_RecalcAlternativeOutput(object_context_p obj_context)
                 &scaling_offset_x, &scaling_offset_y,
                 &scaling_buffer_width, &scaling_buffer_height);
 
-    if ((old_bufw != scaling_buffer_width) || (old_bufh != scaling_buffer_height) ||
-        (old_x != scaling_offset_x) || (old_y != scaling_offset_y) ||
-        (old_w != scaling_width) || (old_h != scaling_height)) {
-        bScaleChanged = 1;
-    }
-
-    old_x = scaling_offset_x;
-    old_y = scaling_offset_y;
-    old_w = scaling_width;
-    old_h = scaling_height;
-    old_bufw = scaling_buffer_width;
-    old_bufh = scaling_buffer_height;
-
     /* turn off ved downscaling if width and height are 0.
      * Besides, scaling_width and scaling_height must be a multiple of 2.
      */
-    if (!ret || (!scaling_width || !scaling_height) ||
+    if (ret || (!scaling_width || !scaling_height) ||
              (scaling_width & 1) || (scaling_height & 1)) {
         obj_context->msvdx_scaling = 0;
         obj_context->scaling_width = 0;
@@ -345,6 +337,13 @@ void psb_RecalcAlternativeOutput(object_context_p obj_context)
         obj_context->scaling_buffer_width = scaling_buffer_width;
         obj_context->scaling_buffer_height = scaling_buffer_height;
     }
+
+    if ((old_bufw != scaling_buffer_width) || (old_bufh != scaling_buffer_height) ||
+        (old_x != scaling_offset_x) || (old_y != scaling_offset_y) ||
+        (old_w != scaling_width) || (old_h != scaling_height)) {
+        bScaleChanged = 1;
+    }
+
     if (bScaleChanged) {
         if ((obj_surface != NULL) &&
             (obj_surface->out_loop_surface != NULL)) {
@@ -475,7 +474,8 @@ VAStatus psb_CreateScalingSurface(
     unsigned int set_flags, clear_flags;
     int ret = 0;
 
-    if (obj_context->driver_data->render_rect.width <= obj_context->scaling_width || obj_context->driver_data->render_rect.height <= obj_context->scaling_height) {
+    if ((obj_context->driver_data->render_rect.width <= obj_context->scaling_width) &&
+        (obj_context->driver_data->render_rect.height <= obj_context->scaling_height)) {
         drv_debug_msg(VIDEO_DEBUG_GENERAL, "Either downscaling is not required or upscaling is needed for the target resolution\n");
         obj_context->msvdx_scaling = 0; /* Disable downscaling */
         clearScalingInfo(share_info);
