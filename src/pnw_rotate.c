@@ -319,7 +319,7 @@ void psb_RecalcAlternativeOutput(object_context_p obj_context)
     /* turn off ved downscaling if width and height are 0.
      * Besides, scaling_width and scaling_height must be a multiple of 2.
      */
-    if (ret || (!scaling_width || !scaling_height) ||
+    if (!ret || (!scaling_width || !scaling_height) ||
              (scaling_width & 1) || (scaling_height & 1)) {
         obj_context->msvdx_scaling = 0;
         obj_context->scaling_width = 0;
