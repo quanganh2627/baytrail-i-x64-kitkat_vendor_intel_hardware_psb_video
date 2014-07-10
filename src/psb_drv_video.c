@@ -695,6 +695,7 @@ VAStatus psb_CreateSurfaces2(
     int memory_type = -1;
     VASurfaceAttribExternalBuffers  *pExternalBufDesc = NULL;
     PsbSurfaceAttributeTPI attribute_tpi;
+	int pixel_format = -1;
 
     CHECK_INVALID_PARAM(num_surfaces <= 0);
     CHECK_SURFACE(surface_list);
@@ -759,6 +760,9 @@ VAStatus psb_CreateSurfaces2(
                     }
                 }
                 break;
+				case VASurfaceAttribPixelFormat:
+					pixel_format = attrib_list->value.value.i;
+					break;
             default:
                 drv_debug_msg(VIDEO_DEBUG_ERROR, "Unsupported attribute.\n");
                 return VA_STATUS_ERROR_INVALID_PARAMETER;
@@ -775,6 +779,14 @@ VAStatus psb_CreateSurfaces2(
         vaStatus = psb_CreateSurfacesWithAttribute(ctx, width, height, format, num_surfaces, surface_list, &attribute_tpi);
         pExternalBufDesc->private_data = (void *)(attribute_tpi.reserved[1]);
         if (attribute_tpi.buffers) free(attribute_tpi.buffers);
+
+		for (i = 0; i < num_surfaces; ++i) {
+			object_surface_p obj_surface;
+
+			obj_surface = SURFACE(surface_list[i]);
+			obj_surface->pixel_format = pixel_format;
+		}
+
         return vaStatus;
     }
 
@@ -820,6 +832,7 @@ VAStatus psb_CreateSurfaces2(
         obj_surface->height_r = height;
         obj_surface->height_origin = height_origin;
         obj_surface->share_info = NULL;
+		obj_surface->pixel_format = pixel_format;
 
         psb_surface = (psb_surface_p) calloc(1, sizeof(struct psb_surface_s));
         if (NULL == psb_surface) {

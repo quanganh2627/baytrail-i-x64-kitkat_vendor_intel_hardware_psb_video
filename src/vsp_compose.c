@@ -58,8 +58,9 @@ VAStatus vsp_compose_process_pipeline_param(context_VPP_p ctx, object_context_p 
 	int yuv_width = 0, yuv_height = 0, yuv_stride = 0;
 	int rgb_width = 0, rgb_height = 0, rgb_stride = 0;
 	int out_width = 0, out_height = 0, out_stride = 0;
-    int op_x = 0, op_y = 0, op_w = 0, op_h = 0;
-    int ip_x = 0, ip_y = 0, ip_w = 0, ip_h = 0;
+	int op_x = 0, op_y = 0, op_w = 0, op_h = 0;
+	int ip_x = 0, ip_y = 0, ip_w = 0, ip_h = 0;
+	int no_rgb = 0, no_yuv = 0;
 
 	cell_compose_param = (struct VssWiDi_ComposeSequenceParameterBuffer *)cmdbuf->compose_param_p;
 
@@ -72,9 +73,12 @@ VAStatus vsp_compose_process_pipeline_param(context_VPP_p ctx, object_context_p 
 	}
 
 	if (pipeline_param->num_additional_outputs <= 0 || !pipeline_param->additional_outputs) {
-		drv_debug_msg(VIDEO_DEBUG_ERROR, "there isn't RGB surface!\n");
-		vaStatus = VA_STATUS_ERROR_UNKNOWN;
-		goto out;
+		no_rgb = 1;
+	} else {
+		/* The RGB surface will be the first element */
+		rgb_surface = SURFACE(pipeline_param->additional_outputs[0]);
+		if (rgb_surface == NULL)
+			no_rgb = 1;
 	}
 
 	/* Init the VSP context */
@@ -82,51 +86,59 @@ VAStatus vsp_compose_process_pipeline_param(context_VPP_p ctx, object_context_p 
 		vsp_cmdbuf_vpp_context(cmdbuf, VssGenInitializeContext, CONTEXT_COMPOSE_ID, VSP_APP_ID_WIDI_ENC);
 
 	yuv_surface = SURFACE(pipeline_param->surface);
-	if (yuv_surface == NULL) {
-		drv_debug_msg(VIDEO_DEBUG_ERROR, "invalid yuv surface %x\n", pipeline_param->surface);
-		vaStatus = VA_STATUS_ERROR_UNKNOWN;
-		goto out;
-	}
-
-	/* The RGB surface will be the first element */
-	rgb_surface = SURFACE(pipeline_param->additional_outputs[0]);
-	if (rgb_surface == NULL) {
-		drv_debug_msg(VIDEO_DEBUG_ERROR, "invalid RGB surface %x\n", pipeline_param->additional_outputs[0]);
-		vaStatus = VA_STATUS_ERROR_UNKNOWN;
-		goto out;
-	}
+	if (yuv_surface == NULL)
+		no_yuv = 1;
 
 	output_surface = ctx->obj_context->current_render_target;
-
-	yuv_width = ALIGN_TO_16(yuv_surface->width);
-	yuv_height = yuv_surface->height_origin;
-	yuv_stride = yuv_surface->psb_surface->stride;
+	if (!no_yuv) {
+		yuv_width = ALIGN_TO_16(yuv_surface->width);
+		yuv_height = yuv_surface->height_origin;
+		yuv_stride = yuv_surface->psb_surface->stride;
+		cell_compose_param->Is_source_1_image_available = 1;
+	} else {
+		cell_compose_param->Is_source_1_image_available = 0;
+	}
 
 	out_width = ALIGN_TO_16(output_surface->width);
 	out_height = output_surface->height_origin;
 	out_stride = output_surface->psb_surface->stride;
 
-	rgb_width = ALIGN_TO_16(rgb_surface->width);
-	rgb_height = ALIGN_TO_16(rgb_surface->height);
-	rgb_stride = rgb_surface->psb_surface->stride;
+	if (!no_rgb) {
+		rgb_width = ALIGN_TO_16(rgb_surface->width);
+		rgb_height = ALIGN_TO_16(rgb_surface->height);
+		rgb_stride = rgb_surface->psb_surface->stride * 4;
+		/* FIXME: should make format an enum */
+		if (rgb_surface->pixel_format == VA_FOURCC_BGRA)
+			cell_compose_param->CSC_InputFormatSelect = 2;
+		else if (rgb_surface->pixel_format == VA_FOURCC_RGBA)
+			cell_compose_param->CSC_InputFormatSelect = 1;
+		else
+			cell_compose_param->CSC_InputFormatSelect = 2;
+
+		cell_compose_param->Is_source_2_image_available = 1;
+		cell_compose_param->Is_Blending_Enabled = 1;
+	} else {
+		cell_compose_param->Is_source_2_image_available = 0;
+		cell_compose_param->Is_Blending_Enabled = 0;
+	}
 
 	ip_w = yuv_width;
 	ip_h = yuv_height;
 	if (pipeline_param->surface_region) {
-		ip_x = pipeline_param->surface_region->x & (~15);
-		ip_y = pipeline_param->surface_region->y & (~15);
-		ip_w = pipeline_param->surface_region->width & (~15);
-		ip_h = pipeline_param->surface_region->height & (~15);
+		ip_x = pipeline_param->surface_region->x;
+		ip_y = pipeline_param->surface_region->y;
+		ip_w = pipeline_param->surface_region->width & (~1);
+		ip_h = pipeline_param->surface_region->height & (~1);
 	}
 
 	/* scale op rect */
 	op_w = out_width;
 	op_h = out_height;
 	if (pipeline_param->output_region) {
-		op_x = pipeline_param->output_region->x & (~15);
-		op_y = pipeline_param->output_region->y & (~15);
-		op_w = pipeline_param->output_region->width & (~15);
-		op_h = pipeline_param->output_region->height & (~15);
+		op_x = pipeline_param->output_region->x & (~1);
+		op_y = pipeline_param->output_region->y & (~1);
+		op_w = pipeline_param->output_region->width & (~1);
+		op_h = pipeline_param->output_region->height & (~1);
 	}
 
 	/* RGB related */
@@ -134,36 +146,47 @@ VAStatus vsp_compose_process_pipeline_param(context_VPP_p ctx, object_context_p 
 	cell_compose_param->ActualHeight = rgb_height;
 	cell_compose_param->ProcessedWidth = cell_compose_param->ActualWidth;
 	cell_compose_param->ProcessedHeight = cell_compose_param->ActualHeight;
-	cell_compose_param->TotalMBCount = ((cell_compose_param->ProcessedWidth >> 4) * (cell_compose_param->ProcessedHeight >> 4));
 	cell_compose_param->Stride = rgb_stride;
-	vsp_cmdbuf_reloc_pic_param(
-				&(cell_compose_param->RGBA_Buffer),
-				0,
-				&(rgb_surface->psb_surface->buf),
-				cmdbuf->param_mem_loc,
-				cell_compose_param);
 
+	if (!no_rgb)
+		vsp_cmdbuf_reloc_pic_param(
+			&(cell_compose_param->RGBA_Buffer),
+			0,
+			&(rgb_surface->psb_surface->buf),
+			cmdbuf->param_mem_loc,
+			cell_compose_param);
+	else
+		cell_compose_param->RGBA_Buffer = 0;
 
 	/* Input YUV Video related */
-	cell_compose_param->Video_IN_xsize = ip_w;
-	cell_compose_param->Video_IN_ysize = ip_h;
-	cell_compose_param->Video_IN_stride = yuv_stride;
+	cell_compose_param->Video_IN_xsize = yuv_width;
+	cell_compose_param->Video_IN_ysize = yuv_height;
+	cell_compose_param->Video_IN_Y_stride = yuv_stride;
+	cell_compose_param->Video_IN_UV_stride = yuv_stride;
 	cell_compose_param->Video_IN_yuv_format = YUV_4_2_0_NV12;
-	vsp_cmdbuf_reloc_pic_param(
-				&(cell_compose_param->Video_IN_Y_Buffer),
-				ip_y * yuv_stride + ip_x,
-				&(yuv_surface->psb_surface->buf),
-				cmdbuf->param_mem_loc,
-				cell_compose_param);
-
-	cell_compose_param->Video_IN_UV_Buffer =
-        cell_compose_param->Video_IN_Y_Buffer + (ip_y / 2 * yuv_stride + ip_x) +
-        yuv_height * cell_compose_param->Video_IN_stride;
+	if (!no_yuv) {
+		vsp_cmdbuf_reloc_pic_param(
+			&(cell_compose_param->Video_IN_Y_Buffer),
+			0,
+			&(yuv_surface->psb_surface->buf),
+			cmdbuf->param_mem_loc,
+			cell_compose_param);
+		vsp_cmdbuf_reloc_pic_param(
+			&(cell_compose_param->Video_IN_UV_Buffer),
+			yuv_height * cell_compose_param->Video_IN_UV_stride,
+			&(yuv_surface->psb_surface->buf),
+			cmdbuf->param_mem_loc,
+			cell_compose_param);
+	} else {
+		cell_compose_param->Video_IN_Y_Buffer = 0;
+		cell_compose_param->Video_IN_UV_Buffer = 0;
+	}
 
 	/* Output Video related */
 	cell_compose_param->Video_OUT_xsize = out_width;
 	cell_compose_param->Video_OUT_ysize = out_height;
-	cell_compose_param->Video_OUT_stride = out_stride;
+	cell_compose_param->Video_OUT_Y_stride = out_stride;
+	cell_compose_param->Video_OUT_UV_stride = out_stride;
 	cell_compose_param->Video_OUT_yuv_format = cell_compose_param->Video_IN_yuv_format;
 	vsp_cmdbuf_reloc_pic_param(
 				&(cell_compose_param->Video_OUT_Y_Buffer),
@@ -174,58 +197,36 @@ VAStatus vsp_compose_process_pipeline_param(context_VPP_p ctx, object_context_p 
 
 	cell_compose_param->Video_OUT_UV_Buffer =
         cell_compose_param->Video_OUT_Y_Buffer +
-        cell_compose_param->Video_OUT_ysize * cell_compose_param->Video_OUT_stride;
+        cell_compose_param->Video_OUT_ysize * cell_compose_param->Video_OUT_UV_stride;
 
 	/* Blending related params */
-    /* check which plane is bigger */
-    if (rgb_width * rgb_height > op_h * op_w) {
-        cell_compose_param->Is_video_the_back_ground = 0;
+	/* check which plane is bigger */
+	if (rgb_width * rgb_height > op_h * op_w)
+	cell_compose_param->Is_video_the_back_ground = 0;
+	else
+	cell_compose_param->Is_video_the_back_ground = 1;
 
-		cell_compose_param->ROI_width = op_w;
-		cell_compose_param->ROI_height = op_h;
-		cell_compose_param->ROI_x1 = op_x;
-		cell_compose_param->ROI_y1 = op_y;
-		cell_compose_param->ROI_x2 = 0;
-		cell_compose_param->ROI_y2 = 0;
-    } else {
-		cell_compose_param->Is_video_the_back_ground = 1;
+	cell_compose_param->ROI_scaling_ip_width = ip_w;
+	cell_compose_param->ROI_scaling_ip_height = ip_h;
+	cell_compose_param->ROI_scaling_ip_x = ip_x;
+	cell_compose_param->ROI_scaling_ip_y = ip_y;
 
-		cell_compose_param->ROI_width = op_w;
-		cell_compose_param->ROI_height = op_h;
-		cell_compose_param->ROI_x1 = 0;
-		cell_compose_param->ROI_y1 = 0;
-		cell_compose_param->ROI_x2 = op_x;
-		cell_compose_param->ROI_y2 = op_y;
+	cell_compose_param->ROI_scaling_op_width = op_w;
+	cell_compose_param->ROI_scaling_op_height = op_h;
+	cell_compose_param->ROI_scaling_op_x = op_x;
+	cell_compose_param->ROI_scaling_op_y = op_y;
+
+	if (!no_yuv) {
+		cell_compose_param->YUVscalefactor_dx = (unsigned int)(1024 / (((float)op_w) / ip_w) + 0.5);
+		cell_compose_param->YUVscalefactor_dy = (unsigned int)(1024 / (((float)op_h) / ip_h) + 0.5);
 	}
 
-	cell_compose_param->scaled_width = op_w;
-	cell_compose_param->scaled_height = op_h;
-	cell_compose_param->scalefactor_dx = (unsigned int)(1024 / (((float)op_w) / ip_w) + 0.5);
-	cell_compose_param->scalefactor_dy = (unsigned int)(1024 / (((float)op_h) / ip_h) + 0.5);
-	cell_compose_param->Video_TotalMBCount =
-		(((op_w + 15) >> 4) * ((op_h + 15) >> 4));
-
-	cell_compose_param->ROI_width = cell_compose_param->scaled_width;
-	cell_compose_param->ROI_height = cell_compose_param->scaled_height;
-
-	cell_compose_param->Is_Blending_Enabled = 1;
 	cell_compose_param->alpha1 = 128;
 	cell_compose_param->alpha2 = 255;
-	cell_compose_param->Is_source_1_image_available = 1;
-	cell_compose_param->Is_source_2_image_available = 1;
 	cell_compose_param->Is_alpha_channel_available = 1; /* 0: RGB Planar; 1: RGBA Interleaved */
 	cell_compose_param->CSC_FormatSelect = 0; /* 0: YUV420NV12; 1: YUV444; */
-	cell_compose_param->CSC_InputFormatSelect = 1; /* 0: RGB Planar; 1: RGBA Interleaved */
-
-	/* The first frame */
-	if (obj_context->frame_count == 0) {
-		vsp_cmdbuf_insert_command(cmdbuf,
-					CONTEXT_COMPOSE_ID,
-					&cmdbuf->param_mem,
-					VssWiDi_ComposeSetSequenceParametersCommand,
-					ctx->compose_param_offset,
-					sizeof(struct VssWiDi_ComposeSequenceParameterBuffer));
-	}
+	/* FIXME: found out how to set by pass from uplayer */
+	cell_compose_param->bypass_mode = 0;
 
 	vsp_cmdbuf_insert_command(cmdbuf,
 				CONTEXT_COMPOSE_ID,

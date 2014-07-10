@@ -573,6 +573,7 @@ struct object_surface_s {
     void *rotate_vaddr;
     struct psb_surface_share_info_s *share_info;
     int is_ref_surface; /* If true, vaDeriveImage returns error */
+	int pixel_format;
 };
 
 #define PSB_CODEDBUF_SLICE_NUM_MASK (0xff)
