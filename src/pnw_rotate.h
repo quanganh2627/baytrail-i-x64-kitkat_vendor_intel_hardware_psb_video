@@ -62,6 +62,10 @@ static uint32_t HAL2VAROTATION(int hal_rotate) {
 #define psb_android_surfaceflinger_rotate(a, b)
 #endif
 
+#define INTEL_OVERLAY_MAX_WIDTH         2047
+#define INTEL_OVERLAY_MAX_HEIGHT        2047
+#define TARGET_SCALE_BUFFER_WIDTH       1920
+
 void psb_InitOutLoop(VADriverContextP ctx);
 void psb_RecalcAlternativeOutput(object_context_p obj_context);
 void psb_CheckInterlaceRotate(object_context_p obj_context, unsigned char *pic_param_tmp);
