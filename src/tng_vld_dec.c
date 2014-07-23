@@ -134,8 +134,7 @@ void vld_dec_setup_alternative_frame(object_context_p obj_context)
         RELOC(*ctx->p_range_mapping_base1, out_loop_surface->buf.buffer_ofs + chroma_addr_offset + out_loop_surface->chroma_offset, &out_loop_surface->buf);
     }
 
-    if (obj_context->profile == VAProfileVP8Version0_3 ||
-        obj_context->profile == VAProfileJPEGBaseline || ctx->yuv_ctx) {
+    {
         psb_cmdbuf_rendec_start(cmdbuf, (REG_MSVDX_CMD_OFFSET + MSVDX_CMDS_AUX_LINE_BUFFER_BASE_ADDRESS_OFFSET));
         psb_cmdbuf_rendec_write_address(cmdbuf, &ctx->aux_line_buffer_vld, ctx->aux_line_buffer_vld.buffer_ofs);
         psb_cmdbuf_rendec_end(cmdbuf);
