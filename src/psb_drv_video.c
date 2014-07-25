@@ -796,12 +796,13 @@ VAStatus psb_CreateSurfaces2(
         pExternalBufDesc->private_data = (void *)(attribute_tpi.reserved[1]);
         if (attribute_tpi.buffers) free(attribute_tpi.buffers);
 
-		for (i = 0; i < num_surfaces; ++i) {
-			object_surface_p obj_surface;
+	for (i = 0; i < num_surfaces; ++i) {
+		object_surface_p obj_surface;
 
-			obj_surface = SURFACE(surface_list[i]);
+		obj_surface = SURFACE(surface_list[i]);
+		if (obj_surface)
 			obj_surface->pixel_format = pixel_format;
-		}
+	}
 
         return vaStatus;
     }
