@@ -58,6 +58,7 @@ VAStatus vsp_compose_process_pipeline_param(context_VPP_p ctx, object_context_p 
 	int yuv_width = 0, yuv_height = 0, yuv_stride = 0;
 	int rgb_width = 0, rgb_height = 0, rgb_stride = 0;
 	int out_width = 0, out_height = 0, out_stride = 0;
+	int out_buf_width = 0, out_buf_height = 0;
 	int op_x = 0, op_y = 0, op_w = 0, op_h = 0;
 	int ip_x = 0, ip_y = 0, ip_w = 0, ip_h = 0;
 	int no_rgb = 0, no_yuv = 0;
@@ -92,15 +93,14 @@ VAStatus vsp_compose_process_pipeline_param(context_VPP_p ctx, object_context_p 
 	output_surface = ctx->obj_context->current_render_target;
 	if (!no_yuv) {
 		yuv_width = ALIGN_TO_16(yuv_surface->width);
-		yuv_height = yuv_surface->height_origin;
+		yuv_height = yuv_surface->height;
 		yuv_stride = yuv_surface->psb_surface->stride;
-		cell_compose_param->Is_source_1_image_available = 1;
-	} else {
-		cell_compose_param->Is_source_1_image_available = 0;
 	}
 
-	out_width = ALIGN_TO_16(output_surface->width);
+	out_width = output_surface->width;
+	out_buf_width = ALIGN_TO_16(output_surface->width);
 	out_height = output_surface->height_origin;
+	out_buf_height = output_surface->height;
 	out_stride = output_surface->psb_surface->stride;
 
 	if (!no_rgb) {
@@ -109,17 +109,11 @@ VAStatus vsp_compose_process_pipeline_param(context_VPP_p ctx, object_context_p 
 		rgb_stride = rgb_surface->psb_surface->stride * 4;
 		/* FIXME: should make format an enum */
 		if (rgb_surface->pixel_format == VA_FOURCC_BGRA)
-			cell_compose_param->CSC_InputFormatSelect = 2;
+			cell_compose_param->RGBA_Format = 2;
 		else if (rgb_surface->pixel_format == VA_FOURCC_RGBA)
-			cell_compose_param->CSC_InputFormatSelect = 1;
+			cell_compose_param->RGBA_Format = 1;
 		else
-			cell_compose_param->CSC_InputFormatSelect = 2;
-
-		cell_compose_param->Is_source_2_image_available = 1;
-		cell_compose_param->Is_Blending_Enabled = 1;
-	} else {
-		cell_compose_param->Is_source_2_image_available = 0;
-		cell_compose_param->Is_Blending_Enabled = 0;
+			cell_compose_param->RGBA_Format = 2;
 	}
 
 	ip_w = yuv_width;
@@ -142,11 +136,9 @@ VAStatus vsp_compose_process_pipeline_param(context_VPP_p ctx, object_context_p 
 	}
 
 	/* RGB related */
-	cell_compose_param->ActualWidth = rgb_width;
-	cell_compose_param->ActualHeight = rgb_height;
-	cell_compose_param->ProcessedWidth = cell_compose_param->ActualWidth;
-	cell_compose_param->ProcessedHeight = cell_compose_param->ActualHeight;
-	cell_compose_param->Stride = rgb_stride;
+	cell_compose_param->RGB_Width = rgb_width;
+	cell_compose_param->RGB_Height = rgb_height;
+	cell_compose_param->RGBA_IN_Stride = rgb_stride;
 
 	if (!no_rgb)
 		vsp_cmdbuf_reloc_pic_param(
@@ -159,11 +151,7 @@ VAStatus vsp_compose_process_pipeline_param(context_VPP_p ctx, object_context_p 
 		cell_compose_param->RGBA_Buffer = 0;
 
 	/* Input YUV Video related */
-	cell_compose_param->Video_IN_xsize = yuv_width;
-	cell_compose_param->Video_IN_ysize = yuv_height;
 	cell_compose_param->Video_IN_Y_stride = yuv_stride;
-	cell_compose_param->Video_IN_UV_stride = yuv_stride;
-	cell_compose_param->Video_IN_yuv_format = YUV_4_2_0_NV12;
 	if (!no_yuv) {
 		vsp_cmdbuf_reloc_pic_param(
 			&(cell_compose_param->Video_IN_Y_Buffer),
@@ -173,7 +161,7 @@ VAStatus vsp_compose_process_pipeline_param(context_VPP_p ctx, object_context_p 
 			cell_compose_param);
 		vsp_cmdbuf_reloc_pic_param(
 			&(cell_compose_param->Video_IN_UV_Buffer),
-			yuv_height * cell_compose_param->Video_IN_UV_stride,
+			yuv_height * cell_compose_param->Video_IN_Y_stride,
 			&(yuv_surface->psb_surface->buf),
 			cmdbuf->param_mem_loc,
 			cell_compose_param);
@@ -186,8 +174,6 @@ VAStatus vsp_compose_process_pipeline_param(context_VPP_p ctx, object_context_p 
 	cell_compose_param->Video_OUT_xsize = out_width;
 	cell_compose_param->Video_OUT_ysize = out_height;
 	cell_compose_param->Video_OUT_Y_stride = out_stride;
-	cell_compose_param->Video_OUT_UV_stride = out_stride;
-	cell_compose_param->Video_OUT_yuv_format = cell_compose_param->Video_IN_yuv_format;
 	vsp_cmdbuf_reloc_pic_param(
 				&(cell_compose_param->Video_OUT_Y_Buffer),
 				0,
@@ -197,7 +183,7 @@ VAStatus vsp_compose_process_pipeline_param(context_VPP_p ctx, object_context_p 
 
 	cell_compose_param->Video_OUT_UV_Buffer =
         cell_compose_param->Video_OUT_Y_Buffer +
-        cell_compose_param->Video_OUT_ysize * cell_compose_param->Video_OUT_UV_stride;
+        out_buf_height * cell_compose_param->Video_OUT_Y_stride;
 
 	/* Blending related params */
 	/* check which plane is bigger */
@@ -221,10 +207,6 @@ VAStatus vsp_compose_process_pipeline_param(context_VPP_p ctx, object_context_p 
 		cell_compose_param->YUVscalefactor_dy = (unsigned int)(1024 / (((float)op_h) / ip_h) + 0.5);
 	}
 
-	cell_compose_param->alpha1 = 128;
-	cell_compose_param->alpha2 = 255;
-	cell_compose_param->Is_alpha_channel_available = 1; /* 0: RGB Planar; 1: RGBA Interleaved */
-	cell_compose_param->CSC_FormatSelect = 0; /* 0: YUV420NV12; 1: YUV444; */
 	/* FIXME: found out how to set by pass from uplayer */
 	cell_compose_param->bypass_mode = 0;
 
