@@ -149,7 +149,7 @@ int psb_android_get_mds_vpp_state(void* output) {
 #ifdef PSBVIDEO_MRFL_VPP
 
 int psb_android_get_vpp_state() {
-    bool ret = VPPSetting::isVppOn();
+    bool ret = VPPSetting::isVppOn(NULL);
     return (ret ? 1 : 0);
 }
 
