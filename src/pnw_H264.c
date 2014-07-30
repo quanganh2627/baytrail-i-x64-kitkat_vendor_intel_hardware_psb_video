@@ -198,8 +198,8 @@ typedef struct context_H264_s *context_H264_p;
 
 #define SURFACE(id)    ((object_surface_p) object_heap_lookup( &ctx->obj_context->driver_data->surface_heap, id ))
 
-#define CACHE_REF_OFFSET        72
-#define CACHE_ROW_OFFSET        4
+#define CACHE_REF_OFFSET        144
+#define CACHE_ROW_OFFSET        8
 
 #define REFERENCE_CACHE_SIZE    (512 * 1024)
 
@@ -1621,6 +1621,13 @@ static void psb__H264_end_slice(context_DEC_p dec_ctx)
     ctx->obj_context->first_mb = (ctx->first_mb_y << 8) | ctx->first_mb_x;
     ctx->obj_context->last_mb = (((ctx->picture_height_mb >> ctx->pic_params->pic_fields.bits.field_pic_flag) - 1) << 8) | (ctx->picture_width_mb - 1);
     *(dec_ctx->slice_first_pic_last) = (ctx->obj_context->first_mb << 16) | (ctx->obj_context->last_mb);
+
+    int fmo = (ctx->pic_params->num_slice_groups_minus1 >= 1);
+    if (fmo == 0) {
+        drv_debug_msg(VIDEO_DEBUG_GENERAL, "Only one slice and fmo is false, no need two pass deblock\n");
+        ctx->obj_context->flags &= ~FW_VA_RENDER_IS_TWO_PASS_DEBLOCK;
+        REGIO_WRITE_FIELD(ctx->obj_context->operating_mode, MSVDX_CMDS, OPERATING_MODE, ASYNC_MODE, 0 );
+    }
 
     ctx->slice_count++;
 }
