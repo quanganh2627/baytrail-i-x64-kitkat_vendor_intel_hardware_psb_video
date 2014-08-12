@@ -65,6 +65,10 @@ VAStatus vsp_compose_process_pipeline_param(context_VPP_p ctx, object_context_p 
 
 	cell_compose_param = (struct VssWiDi_ComposeSequenceParameterBuffer *)cmdbuf->compose_param_p;
 
+	/* init tile set */
+	cell_compose_param->Is_input_tiled = 0;
+	cell_compose_param->Is_output_tiled = 0;
+
 	/* The END command */
 	if (pipeline_param->pipeline_flags & VA_PIPELINE_FLAG_END) {
 		vsp_cmdbuf_compose_end(cmdbuf);
@@ -95,7 +99,17 @@ VAStatus vsp_compose_process_pipeline_param(context_VPP_p ctx, object_context_p 
 		yuv_width = ALIGN_TO_16(yuv_surface->width);
 		yuv_height = yuv_surface->height;
 		yuv_stride = yuv_surface->psb_surface->stride;
+
+#ifdef PSBVIDEO_VPP_TILING
+		if (GET_SURFACE_INFO_tiling(yuv_surface->psb_surface))
+			cell_compose_param->Is_input_tiled = 1;
+#endif
 	}
+
+#ifdef PSBVIDEO_VPP_TILING
+		if (GET_SURFACE_INFO_tiling(output_surface->psb_surface))
+			cell_compose_param->Is_output_tiled = 1;
+#endif
 
 	out_width = output_surface->width;
 	out_buf_width = ALIGN_TO_16(output_surface->width);
