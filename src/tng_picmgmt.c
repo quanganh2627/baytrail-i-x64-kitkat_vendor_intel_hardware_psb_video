@@ -602,8 +602,8 @@ IMG_UINT32 tng_send_source_frame(
     }
 
     if (psb_video_debug_option & CLFLUSH_DEBUG_SOURCE)
-        if (src_surface->psb_surface->buf.pl_flags & WSBM_PL_FLAG_CACHED)
-            src_surface->psb_surface->buf.unfence_flag = 2;
+        /*if (src_surface->psb_surface->buf.pl_flags & WSBM_PL_FLAG_CACHED)*/
+        src_surface->psb_surface->buf.unfence_flag = 2;
 
     vaStatus = psb_buffer_map(&cmdbuf->frame_mem, &(cmdbuf->frame_mem_p));
     if (vaStatus) {
