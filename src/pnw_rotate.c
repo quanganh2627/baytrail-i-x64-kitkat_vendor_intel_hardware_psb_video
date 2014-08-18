@@ -321,22 +321,34 @@ void psb_RecalcAlternativeOutput(object_context_p obj_context)
      */
     if (!ret || (!scaling_width || !scaling_height) ||
              (scaling_width & 1) || (scaling_height & 1)) {
-        obj_context->msvdx_scaling = 0;
-        obj_context->scaling_width = 0;
-        obj_context->scaling_height = 0;
-        obj_context->scaling_offset_x= 0;
-        obj_context->scaling_offset_y = 0;
-        obj_context->scaling_buffer_width = 0;
-        obj_context->scaling_buffer_height = 0;
+        if ((obj_context->picture_width > INTEL_OVERLAY_MAX_WIDTH) ||
+                 (obj_context->picture_height > INTEL_OVERLAY_MAX_HEIGHT)) {
+             obj_context->msvdx_scaling = 1;
+             scaling_width = TARGET_SCALE_BUFFER_WIDTH;
+             scaling_height = (((int)(TARGET_SCALE_BUFFER_WIDTH * obj_context->picture_height / obj_context->picture_width) >> 1) << 1);
+             scaling_offset_x = 0;
+             scaling_offset_y = 0;
+             scaling_buffer_width = scaling_width;
+             scaling_buffer_height = scaling_height;
+        } else {
+             obj_context->msvdx_scaling = 0;
+             scaling_width = 0;
+             scaling_height = 0;
+             scaling_offset_x = 0;
+             scaling_offset_y = 0;
+             scaling_buffer_width = 0;
+             scaling_buffer_height = 0;
+        }
     } else {
         obj_context->msvdx_scaling = 1;
+    }
+
         obj_context->scaling_width = scaling_width;
         obj_context->scaling_height = scaling_height;
         obj_context->scaling_offset_x= scaling_offset_x;
         obj_context->scaling_offset_y = scaling_offset_y;
         obj_context->scaling_buffer_width = scaling_buffer_width;
         obj_context->scaling_buffer_height = scaling_buffer_height;
-    }
 
     if ((old_bufw != scaling_buffer_width) || (old_bufh != scaling_buffer_height) ||
         (old_x != scaling_offset_x) || (old_y != scaling_offset_y) ||
@@ -505,7 +517,7 @@ VAStatus psb_CreateScalingSurface(
 
         vaStatus = psb_surface_create(obj_context->driver_data, obj_context->scaling_width,
                                       (obj_context->scaling_height + 0x1f) & ~0x1f, VA_FOURCC_NV12,
-                                      0, psb_surface);
+                                      2, psb_surface);
 
         //set_flags = WSBM_PL_FLAG_CACHED | DRM_PSB_FLAG_MEM_MMU | WSBM_PL_FLAG_SHARED;
         //clear_flags = WSBM_PL_FLAG_UNCACHED | WSBM_PL_FLAG_WC;

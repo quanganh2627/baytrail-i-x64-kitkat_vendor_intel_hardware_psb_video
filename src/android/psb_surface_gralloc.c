@@ -371,60 +371,66 @@ VAStatus psb_CreateSurfacesFromGralloc(
             if ((gfx_colorformat != HAL_PIXEL_FORMAT_NV12) &&
                 (gfx_colorformat != HAL_PIXEL_FORMAT_YV12) &&
 		(format != VA_RT_FORMAT_RGB32)) {
+
+                unsigned int init_share_info = (unsigned int)external_buffers->reserved[2];
+                drv_debug_msg(VIDEO_DEBUG_ERROR, "%s : Create graphic buffer initialized share info %d",__FUNCTION__, init_share_info);
                 obj_surface->share_info = (psb_surface_share_info_t *)vaddr[GRALLOC_SUB_BUFFER1];
-                memset(obj_surface->share_info, 0, sizeof(struct psb_surface_share_info_s));
-                // Set clear video the default output method as OUTPUT_FORCE_OVERLAY_FOR_SW_DECODE
-                // if the video can be decoded by HW, will reset the output method as 0 in psb_BeginPicture
-                obj_surface->share_info->force_output_method = protected ? OUTPUT_FORCE_OVERLAY : OUTPUT_FORCE_OVERLAY_FOR_SW_DECODE;
+
+                if (init_share_info) {
+                    memset(obj_surface->share_info, 0, sizeof(struct psb_surface_share_info_s));
+                    // Set clear video the default output method as OUTPUT_FORCE_OVERLAY_FOR_SW_DECODE
+                    // if the video can be decoded by HW, will reset the output method as 0 in psb_BeginPicture
+                    obj_surface->share_info->force_output_method = protected ? OUTPUT_FORCE_OVERLAY : OUTPUT_FORCE_OVERLAY_FOR_SW_DECODE;
 #ifdef PSBVIDEO_MSVDX_DEC_TILING
-                obj_surface->share_info->tiling = external_buffers->tiling;
+                    obj_surface->share_info->tiling = external_buffers->tiling;
 #endif
-                obj_surface->share_info->width = obj_surface->width;
-                obj_surface->share_info->height = obj_surface->height;/*Buffer Height*/
+                    obj_surface->share_info->width = obj_surface->width;
+                    obj_surface->share_info->height = obj_surface->height;/*Buffer Height*/
 
-                obj_surface->share_info->luma_stride = psb_surface->stride;
-                obj_surface->share_info->chroma_u_stride = psb_surface->stride;
-                obj_surface->share_info->chroma_v_stride = psb_surface->stride;
-                obj_surface->share_info->format = VA_FOURCC_NV12;
+                    obj_surface->share_info->luma_stride = psb_surface->stride;
+                    obj_surface->share_info->chroma_u_stride = psb_surface->stride;
+                    obj_surface->share_info->chroma_v_stride = psb_surface->stride;
+                    obj_surface->share_info->format = VA_FOURCC_NV12;
 
-                obj_surface->share_info->khandle = (uint32_t)(wsbmKBufHandle(wsbmKBuf(psb_surface->buf.drm_buf)));
+                    obj_surface->share_info->khandle = (uint32_t)(wsbmKBufHandle(wsbmKBuf(psb_surface->buf.drm_buf)));
 
-                obj_surface->share_info->renderStatus = 0;
-                obj_surface->share_info->used_by_widi = 0;
-                obj_surface->share_info->native_window = (void *)external_buffers->reserved[0];
+                    obj_surface->share_info->renderStatus = 0;
+                    obj_surface->share_info->used_by_widi = 0;
+                    obj_surface->share_info->native_window = (void *)external_buffers->reserved[0];
 
-                // send out share info via PsbSurfaceAttributeTPI so that share info can be filled                // out outside vaCreateSurface()
-                attribute_tpi->reserved[1] = (unsigned long)obj_surface->share_info;
+                    // send out share info via PsbSurfaceAttributeTPI so that share info can be filled
+                    // out outside vaCreateSurface()
+                    attribute_tpi->reserved[1] = (unsigned long)obj_surface->share_info;
 
-                // overlay only support BT.601 and BT.709
-                if (driver_data->load_csc_matrix == 1) {
-                    obj_surface->share_info->csc_mode = (driver_data->is_BT601 == 1) ? 0 : 1;
-                } else {
-                    // if csc matrix is not set, use BT601 by default
-                    obj_surface->share_info->csc_mode = 0;
+                    // overlay only support BT.601 and BT.709
+                    if (driver_data->load_csc_matrix == 1) {
+                        obj_surface->share_info->csc_mode = (driver_data->is_BT601 == 1) ? 0 : 1;
+                    } else {
+                        // if csc matrix is not set, use BT601 by default
+                        obj_surface->share_info->csc_mode = 0;
+                    }
+
+                    if (driver_data->set_video_range == 1) {
+                        obj_surface->share_info->video_range = driver_data->video_range;
+                    } else {
+                        // if video range is not set, use limited range by default
+                        obj_surface->share_info->video_range = 0;
+                    }
+
+                    obj_surface->share_info->surface_protected = driver_data->protected;
+                    if (driver_data->render_rect.width == 0 || driver_data->render_rect.height == 0) {
+                        obj_surface->share_info->crop_width = obj_surface->share_info->width;
+                        obj_surface->share_info->crop_height = obj_surface->share_info->height;
+                    } else {
+                        obj_surface->share_info->crop_width = driver_data->render_rect.width;
+                        obj_surface->share_info->crop_height = driver_data->render_rect.height;
+                    }
+
+                    if (obj_surface->share_info->coded_width == 0 || obj_surface->share_info->coded_height == 0) {
+                        obj_surface->share_info->coded_width = (obj_surface->share_info->width + 0xf) & ~0xf;
+                        obj_surface->share_info->coded_height = (obj_surface->share_info->height + 0xf) & ~0xf;
+                    }
                 }
-
-                if (driver_data->set_video_range == 1) {
-                    obj_surface->share_info->video_range = driver_data->video_range;
-                } else {
-                    // if video range is not set, use limited range by default
-                    obj_surface->share_info->video_range = 0;
-                }
-
-                obj_surface->share_info->surface_protected = driver_data->protected;
-                if (driver_data->render_rect.width == 0 || driver_data->render_rect.height == 0) {
-                    obj_surface->share_info->crop_width = obj_surface->share_info->width;
-                    obj_surface->share_info->crop_height = obj_surface->share_info->height;
-                } else {
-                    obj_surface->share_info->crop_width = driver_data->render_rect.width;
-                    obj_surface->share_info->crop_height = driver_data->render_rect.height;
-                }
-
-                if (obj_surface->share_info->coded_width == 0 || obj_surface->share_info->coded_height == 0) {
-                    obj_surface->share_info->coded_width = (obj_surface->share_info->width + 0xf) & ~0xf;
-                    obj_surface->share_info->coded_height = (obj_surface->share_info->height + 0xf) & ~0xf;
-                }
-
                 drv_debug_msg(VIDEO_DEBUG_GENERAL, "%s : Create graphic buffer success"
                                          "surface_id= 0x%x, vaddr[0] (0x%x), vaddr[1] (0x%x)\n",
                                          __FUNCTION__, surfaceID, vaddr[GRALLOC_SUB_BUFFER0], vaddr[GRALLOC_SUB_BUFFER1]);

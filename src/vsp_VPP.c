@@ -402,6 +402,9 @@ static VAStatus vsp__VPP_process_pipeline_param(context_VPP_p ctx, object_contex
 	int tiled = 0, width = 0, height = 0, stride = 0;
 	unsigned char *src_addr, *dest_addr;
 	struct psb_surface_s *output_surface;
+        psb_surface_share_info_p input_share_info = NULL;
+        psb_surface_share_info_p output_share_info = NULL;
+
 	psb_driver_data_p driver_data = obj_context->driver_data;
 
 	if (pipeline_param->surface_region != NULL) {
@@ -541,12 +544,16 @@ static VAStatus vsp__VPP_process_pipeline_param(context_VPP_p ctx, object_contex
 	if (width > input_surface->psb_surface->stride)
 		width = input_surface->psb_surface->stride;
 
+        /* get the input share info */
+        input_share_info = input_surface->share_info;
+        drv_debug_msg(VIDEO_DEBUG_GENERAL, "%s The input surface %p share info %p\n", __func__, input_surface,input_surface->share_info);
+
 	/* Setup input surface */
 	cell_proc_picture_param->num_input_pictures  = 1;
 	cell_proc_picture_param->input_picture[0].surface_id = pipeline_param->surface;
 	vsp_cmdbuf_reloc_pic_param(&(cell_proc_picture_param->input_picture[0].base), ctx->pic_param_offset, &(input_surface->psb_surface->buf),
 				   cmdbuf->param_mem_loc, cell_proc_picture_param);
-	cell_proc_picture_param->input_picture[0].height = input_surface->height_origin;
+	cell_proc_picture_param->input_picture[0].height = input_surface->height;
 	cell_proc_picture_param->input_picture[0].width = width;
 	cell_proc_picture_param->input_picture[0].irq = 0;
 	cell_proc_picture_param->input_picture[0].stride = input_surface->psb_surface->stride;
@@ -635,7 +642,7 @@ static VAStatus vsp__VPP_process_pipeline_param(context_VPP_p ctx, object_contex
 			width = ALIGN_TO_16(cur_output_surf->width);
 			if (width > cur_output_surf->psb_surface->stride)
 				width = cur_output_surf->psb_surface->stride;
-			height = cur_output_surf->height_origin;
+			height = cur_output_surf->height;
 			stride = cur_output_surf->psb_surface->stride;
 
 			/* Check the rotate bit */
@@ -661,6 +668,43 @@ static VAStatus vsp__VPP_process_pipeline_param(context_VPP_p ctx, object_contex
 		cell_proc_picture_param->output_picture[i].format = ctx->format;
 		cell_proc_picture_param->output_picture[i].rot_angle = vsp_rotation_angle;
 		cell_proc_picture_param->output_picture[i].tiled = tiled;
+
+	        /* copy the input share info to output */
+		output_share_info = cur_output_surf->share_info;
+		if (input_share_info != NULL && output_share_info != NULL) {
+			output_share_info->metadata_rotate = input_share_info->metadata_rotate;
+			output_share_info->surface_rotate = 0;
+			output_share_info->width_r = 0;
+			output_share_info->height_r = 0;
+			output_share_info->surface_protected = input_share_info->surface_protected;
+			output_share_info->force_output_method = input_share_info->force_output_method;
+			output_share_info->used_by_widi = input_share_info->used_by_widi;
+			output_share_info->bob_deinterlace = input_share_info->bob_deinterlace;
+			output_share_info->tiling = input_share_info->tiling;
+			output_share_info->width = input_share_info->width;
+			output_share_info->height = input_share_info->height;
+			output_share_info->luma_stride = input_share_info->luma_stride;
+			output_share_info->chroma_u_stride = input_share_info->chroma_u_stride;
+			output_share_info->chroma_v_stride = input_share_info->chroma_v_stride;
+			output_share_info->format = input_share_info->format;
+			output_share_info->timestamp = input_share_info->timestamp;
+			output_share_info->out_loop_luma_stride = input_share_info->out_loop_luma_stride;
+			output_share_info->out_loop_chroma_u_stride = input_share_info->out_loop_chroma_u_stride;
+			output_share_info->out_loop_chroma_v_stride = input_share_info->out_loop_chroma_v_stride;
+
+			output_share_info->hwc_timestamp = input_share_info->hwc_timestamp;
+			output_share_info->layer_transform = input_share_info->layer_transform;
+
+			output_share_info->native_window = input_share_info->native_window;
+			output_share_info->crop_width = input_share_info->crop_width;
+			output_share_info->crop_height = input_share_info->crop_height;
+			output_share_info->coded_width = input_share_info->coded_width;
+			output_share_info->coded_height = input_share_info->coded_height;
+
+			drv_debug_msg(VIDEO_DEBUG_GENERAL, "The input/output wxh %dx%d\n",input_share_info->width,input_share_info->height);
+		} else {
+			drv_debug_msg(VIDEO_DEBUG_WARNING, "The input/output share_info is NULL!!\n");
+		}
 	}
 
 	vsp_cmdbuf_insert_command(cmdbuf, CONTEXT_VPP_ID, &cmdbuf->param_mem, VssProcPictureCommand,

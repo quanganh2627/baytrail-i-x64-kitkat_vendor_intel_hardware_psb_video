@@ -38,7 +38,6 @@
 
 #define GET_SURFACE_INFO_colocated_index(psb_surface) ((int) (psb_surface->extra_info[3]))
 #define SET_SURFACE_INFO_colocated_index(psb_surface, val) psb_surface->extra_info[3] = (uint32_t) val;
-#define SURFACE(id) ((object_surface_p) object_heap_lookup( &driver_data->surface_heap, id ))
 
 /* Set MSVDX Front end register */
 void vld_dec_FE_state(object_context_p obj_context, psb_buffer_p buf)
@@ -134,8 +133,7 @@ void vld_dec_setup_alternative_frame(object_context_p obj_context)
         RELOC(*ctx->p_range_mapping_base1, out_loop_surface->buf.buffer_ofs + chroma_addr_offset + out_loop_surface->chroma_offset, &out_loop_surface->buf);
     }
 
-    if (obj_context->profile == VAProfileVP8Version0_3 ||
-        obj_context->profile == VAProfileJPEGBaseline || ctx->yuv_ctx) {
+    {
         psb_cmdbuf_rendec_start(cmdbuf, (REG_MSVDX_CMD_OFFSET + MSVDX_CMDS_AUX_LINE_BUFFER_BASE_ADDRESS_OFFSET));
         psb_cmdbuf_rendec_write_address(cmdbuf, &ctx->aux_line_buffer_vld, ctx->aux_line_buffer_vld.buffer_ofs);
         psb_cmdbuf_rendec_end(cmdbuf);
@@ -395,8 +393,6 @@ psb_buffer_p vld_dec_lookup_colocated_buffer(context_DEC_p ctx, psb_surface_p su
 VAStatus vld_dec_CreateContext(context_DEC_p ctx, object_context_p obj_context)
 {
     VAStatus vaStatus = VA_STATUS_SUCCESS;
-    int i;
-    psb_driver_data_p driver_data = obj_context->driver_data;
 
     ctx->obj_context = obj_context;
     ctx->split_buffer_pending = FALSE;
@@ -425,15 +421,6 @@ VAStatus vld_dec_CreateContext(context_DEC_p ctx, object_context_p obj_context)
                                      psb_bt_cpu_vpu,
                                      &ctx->aux_line_buffer_vld);
         DEBUG_FAILURE;
-    }
-
-    if (driver_data->protected || driver_data->vpp_on)
-        return vaStatus;
-
-    for (i = 0; i < obj_context->num_render_targets; i++) {
-        object_surface_p obj_surface = SURFACE(obj_context->render_targets[i]);
-        if (obj_surface && obj_surface->share_info)
-            obj_surface->share_info->force_output_method = 1;
     }
 
     return vaStatus;

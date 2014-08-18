@@ -693,8 +693,10 @@ VAStatus psb_CreateSurfaces2(
     unsigned long fourcc;
     unsigned int flags = 0;
     int memory_type = -1;
+    unsigned int initalized_info_flag = 1;
     VASurfaceAttribExternalBuffers  *pExternalBufDesc = NULL;
     PsbSurfaceAttributeTPI attribute_tpi;
+	int pixel_format = -1;
 
     CHECK_INVALID_PARAM(num_surfaces <= 0);
     CHECK_SURFACE(surface_list);
@@ -759,6 +761,22 @@ VAStatus psb_CreateSurfaces2(
                     }
                 }
                 break;
+				case VASurfaceAttribPixelFormat:
+					pixel_format = attrib_list->value.value.i;
+					break;
+            case VASurfaceAttribUsageHint:
+                {
+                    /* Share info is to be initialized when created sufaces by default (for the data producer)
+                     * VPP Read indicate we do not NOT touch share info (for data consumer, which share buffer with data
+                     * producer, such as of VPP).
+                     */
+                    drv_debug_msg(VIDEO_DEBUG_GENERAL, "VASurfaceAttribUsageHint.\n");
+                    if ((attrib_list->value.value.i & VA_SURFACE_ATTRIB_USAGE_HINT_VPP_READ)!= 0){
+                        initalized_info_flag = 0;
+                        drv_debug_msg(VIDEO_DEBUG_GENERAL, "explicat not initialized share info.\n");
+                    }
+                }
+                break;
             default:
                 drv_debug_msg(VIDEO_DEBUG_ERROR, "Unsupported attribute.\n");
                 return VA_STATUS_ERROR_INVALID_PARAMETER;
@@ -772,9 +790,20 @@ VAStatus psb_CreateSurfaces2(
     }
     else if(memory_type !=-1 && pExternalBufDesc != NULL) {
         attribute_tpi.type = memory_type;
+        //set initialized share info in reserverd 1, by default we will initialized share_info
+        attribute_tpi.reserved[2] = (unsigned int)initalized_info_flag;
         vaStatus = psb_CreateSurfacesWithAttribute(ctx, width, height, format, num_surfaces, surface_list, &attribute_tpi);
         pExternalBufDesc->private_data = (void *)(attribute_tpi.reserved[1]);
         if (attribute_tpi.buffers) free(attribute_tpi.buffers);
+
+	for (i = 0; i < num_surfaces; ++i) {
+		object_surface_p obj_surface;
+
+		obj_surface = SURFACE(surface_list[i]);
+		if (obj_surface)
+			obj_surface->pixel_format = pixel_format;
+	}
+
         return vaStatus;
     }
 
@@ -820,6 +849,7 @@ VAStatus psb_CreateSurfaces2(
         obj_surface->height_r = height;
         obj_surface->height_origin = height_origin;
         obj_surface->share_info = NULL;
+		obj_surface->pixel_format = pixel_format;
 
         psb_surface = (psb_surface_p) calloc(1, sizeof(struct psb_surface_s));
         if (NULL == psb_surface) {
