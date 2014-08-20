@@ -28,8 +28,7 @@ include $(CLEAR_VARS)
 
 LOCAL_CFLAGS := \
     -DLINUX -DANDROID -g -Wall -Wno-unused \
-    -DPSBVIDEO_LOG_ENABLE -DPSBVIDEO_VXD392 \
-    -DPSBVIDEO_MSVDX_DEC_TILING -DPSBVIDEO_MSVDX_EC
+    -DPSBVIDEO_MSVDX_DEC_TILING -DPSBVIDEO_LOG_ENABLE
 
 LOCAL_C_INCLUDES := \
     $(call include-path-for, libhardware)/hardware \
@@ -68,8 +67,7 @@ LOCAL_SRC_FILES := \
     pnw_rotate.c \
     tng_vld_dec.c \
     tng_yuv_processor.c \
-    tng_VP8.c \
-    tng_jpegdec.c
+    tng_ved_scaling.c
 
 ifneq ($(filter $(TARGET_BOARD_PLATFORM),merrifield moorefield morganfield),)
 LOCAL_SRC_FILES += \
@@ -81,7 +79,6 @@ LOCAL_SRC_FILES += \
     pnw_hostheader.c \
     pnw_hostjpeg.c \
     pnw_jpeg.c \
-    tng_ved_scaling.c \
     tng_cmdbuf.c \
     tng_hostheader.c \
     tng_hostcode.c \
@@ -94,6 +91,8 @@ LOCAL_SRC_FILES += \
     tng_slotorder.c \
     tng_hostair.c \
     tng_trace.c \
+    tng_VP8.c \
+    tng_jpegdec.c \
     vsp_VPP.c \
     vsp_cmdbuf.c \
     vsp_vp8.c \
@@ -107,16 +106,40 @@ LOCAL_C_INCLUDES += \
 LOCAL_SHARED_LIBRARIES += libpvr2d libvpp_setting
 LOCAL_CFLAGS += \
     -DPSBVIDEO_MRFL_VPP -DPSBVIDEO_MRFL \
-    -DPSBVIDEO_VPP_TILING -DSLICE_HEADER_PARSING
+    -DPSBVIDEO_VPP_TILING -DSLICE_HEADER_PARSING \
+    -DPSBVIDEO_VXD392 -DPSBVIDEO_MSVDX_EC
 
 ifeq ($(TARGET_BOARD_PLATFORM),merrifield)
 LOCAL_CFLAGS += -DPSBVIDEO_MRFL_VPP_ROTATE
 endif
 
 else
+
+ifneq ($(filter $(TARGET_BOARD_PLATFORM),clovertrail),)
+LOCAL_SRC_FILES += \
+    pnw_H263ES.c \
+    pnw_H264ES.c \
+    pnw_MPEG4ES.c \
+    pnw_cmdbuf.c \
+    pnw_hostcode.c \
+    pnw_hostheader.c \
+    pnw_hostjpeg.c \
+    pnw_jpeg.c
+
+LOCAL_C_INCLUDES += \
+    $(TARGET_OUT_HEADERS)/pvr \
+    $(TARGET_OUT_HEADERS)/pvr/pvr2d
+
+LOCAL_SHARED_LIBRARIES += libpvr2d
+
+LOCAL_CFLAGS += -DPSBVIDEO_MFLD -DSLICE_HEADER_PARSING
+
+else
 LOCAL_CFLAGS += \
     -DPSBVIDEO_VXD392 -DBAYTRAIL \
     -DPSBVIDEO_MSVDX_DEC_TILING -DPSBVIDEO_MSVDX_EC
+endif
+
 endif
 
 ifeq ($(TARGET_HAS_MULTIPLE_DISPLAY),true)
