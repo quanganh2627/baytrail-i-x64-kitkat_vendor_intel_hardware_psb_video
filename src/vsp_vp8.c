@@ -116,7 +116,7 @@ static void vsp_VP8_QueryConfigAttributes(
         case VAConfigAttribRTFormat:
             break;
         case VAConfigAttribRateControl:
-            attrib_list[i].value = VA_RC_CBR | VA_RC_VCM;
+            attrib_list[i].value = VA_RC_CBR | VA_RC_VCM | VA_RC_VBR;
             break;
         case VAConfigAttribEncAutoReference:
             attrib_list[i].value = 1;
