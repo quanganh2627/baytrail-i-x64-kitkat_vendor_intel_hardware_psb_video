@@ -69,6 +69,19 @@ LOCAL_SRC_FILES := \
     tng_yuv_processor.c \
     tng_ved_scaling.c
 
+ifneq ($(filter $(TARGET_BOARD_PLATFORM),baytrail),)
+LOCAL_SRC_FILES += \
+    tng_VP8.c \
+    tng_jpegdec.c \
+
+LOCAL_C_INCLUDES += \
+    $(TARGET_OUT_HEADERS)/libmedia_utils_vpp
+
+LOCAL_SHARED_LIBRARIES += libvpp_setting
+LOCAL_CFLAGS += \
+    -DPSBVIDEO_VXD392 -DPSBVIDEO_MSVDX_EC -DBAYTRAIL
+
+else 
 ifneq ($(filter $(TARGET_BOARD_PLATFORM),merrifield moorefield morganfield),)
 LOCAL_SRC_FILES += \
     pnw_H263ES.c \
@@ -139,7 +152,7 @@ LOCAL_CFLAGS += \
     -DPSBVIDEO_VXD392 -DBAYTRAIL \
     -DPSBVIDEO_MSVDX_DEC_TILING -DPSBVIDEO_MSVDX_EC
 endif
-
+endif
 endif
 
 ifeq ($(TARGET_HAS_MULTIPLE_DISPLAY),true)
