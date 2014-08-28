@@ -1966,7 +1966,9 @@ static void psb__VC1_send_rendec_params(context_VC1_p ctx, VASliceParameterBuffe
 
     vld_dec_setup_alternative_frame(ctx->obj_context);
 
-    if (ctx->pic_params->picture_fields.bits.frame_coding_mode == VC1_FCM_P && CONTEXT_ROTATE(ctx->obj_context))
+    if (CONTEXT_SCALING(ctx->obj_context))
+        deblock_surface = ctx->obj_context->current_render_target->scaling_surface;
+    else if (ctx->pic_params->picture_fields.bits.frame_coding_mode == VC1_FCM_P && CONTEXT_ROTATE(ctx->obj_context))
         deblock_surface = ctx->obj_context->current_render_target->out_loop_surface;
 
     /* CHUNK: 3 */
