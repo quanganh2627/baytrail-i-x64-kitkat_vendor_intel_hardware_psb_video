@@ -159,7 +159,7 @@ LOCAL_CFLAGS += -DTARGET_HAS_MULTIPLE_DISPLAY
 LOCAL_SHARED_LIBRARIES += libmultidisplay
 endif
 
-ifeq ($(TARGET_HAS_VPP),true)
+ifeq ($(TARGET_HAS_ISV),true)
 LOCAL_SHARED_LIBRARIES += libvpp_setting
 endif
 

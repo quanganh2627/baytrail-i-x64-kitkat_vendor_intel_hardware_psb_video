@@ -1061,9 +1061,9 @@ VAStatus psb_CreateContext(
     drv_debug_msg(VIDEO_DEBUG_INIT, "CreateContext config_id:%d, pic_w:%d, pic_h:%d, flag:%d, num_render_targets:%d.\n",
         config_id, picture_width, picture_height, flag, num_render_targets);
 
-    CHECK_INVALID_PARAM(num_render_targets <= 0);
+    //CHECK_INVALID_PARAM(num_render_targets <= 0);
 
-    CHECK_SURFACE(render_targets);
+    //CHECK_SURFACE(render_targets);
     CHECK_CONTEXT(context);
 
     vaStatus = psb__checkSurfaceDimensions(driver_data, picture_width, picture_height);
@@ -1103,14 +1103,17 @@ VAStatus psb_CreateContext(
 #endif
     obj_context->scaling_width = 0;
     obj_context->scaling_height = 0;
-    obj_context->render_targets = (VASurfaceID *) calloc(1, num_render_targets * sizeof(VASurfaceID));
-    if (obj_context->render_targets == NULL) {
-        vaStatus = VA_STATUS_ERROR_ALLOCATION_FAILED;
-        DEBUG_FAILURE;
 
-        object_heap_free(&driver_data->context_heap, (object_base_p) obj_context);
+    if (num_render_targets > 0) {
+        obj_context->render_targets = (VASurfaceID *) calloc(1, num_render_targets * sizeof(VASurfaceID));
+        if (obj_context->render_targets == NULL) {
+            vaStatus = VA_STATUS_ERROR_ALLOCATION_FAILED;
+            DEBUG_FAILURE;
 
-        return vaStatus;
+            object_heap_free(&driver_data->context_heap, (object_base_p) obj_context);
+
+            return vaStatus;
+        }
     }
 
     /* allocate buffer points for vaRenderPicture */
@@ -1120,7 +1123,8 @@ VAStatus psb_CreateContext(
         vaStatus = VA_STATUS_ERROR_ALLOCATION_FAILED;
         DEBUG_FAILURE;
 
-        free(obj_context->render_targets);
+        if (NULL != obj_context->render_targets)
+            free(obj_context->render_targets);
         object_heap_free(&driver_data->context_heap, (object_base_p) obj_context);
 
         return vaStatus;
@@ -1152,29 +1156,30 @@ VAStatus psb_CreateContext(
         cmdbuf_num = VSP_MAX_CMDBUFS;
     else
         cmdbuf_num = PSB_MAX_CMDBUFS;
+    
+    if (num_render_targets > 0) {
+        for (i = 0; i < num_render_targets; i++) {
+            object_surface_p obj_surface = SURFACE(render_targets[i]);
+            psb_surface_p psb_surface;
 
-    for (i = 0; i < num_render_targets; i++) {
-        object_surface_p obj_surface = SURFACE(render_targets[i]);
-        psb_surface_p psb_surface;
+            if (NULL == obj_surface) {
+                vaStatus = VA_STATUS_ERROR_INVALID_SURFACE;
+                DEBUG_FAILURE;
+                break;
+            }
 
-        if (NULL == obj_surface) {
-            vaStatus = VA_STATUS_ERROR_INVALID_SURFACE;
-            DEBUG_FAILURE;
-            break;
-        }
+            if (!driver_data->protected && obj_surface->share_info)
+                obj_surface->share_info->force_output_method = 0;
 
-        if (!driver_data->protected && obj_surface->share_info)
-            obj_surface->share_info->force_output_method = 0;
+            psb_surface = obj_surface->psb_surface;
 
-        psb_surface = obj_surface->psb_surface;
-
-        /* Clear format specific surface info */
-        obj_context->render_targets[i] = render_targets[i];
-        obj_surface->context_id = contextID; /* Claim ownership of surface */
+            /* Clear format specific surface info */
+            obj_context->render_targets[i] = render_targets[i];
+            obj_surface->context_id = contextID; /* Claim ownership of surface */
 #ifdef PSBVIDEO_MSVDX_DEC_TILING
-        if (GET_SURFACE_INFO_tiling(psb_surface))
+            if (GET_SURFACE_INFO_tiling(psb_surface))
 #ifdef BAYTRAIL
-            obj_context->msvdx_tile = psb__tile_stride_log2_512(obj_surface->width);
+                obj_context->msvdx_tile = psb__tile_stride_log2_512(obj_surface->width);
 #else
             if (obj_config->entrypoint == VAEntrypointVideoProc && obj_config->profile == VAProfileNone)
                 // It's for two pass rotation case
@@ -1185,12 +1190,13 @@ VAStatus psb_CreateContext(
 #endif
 #endif
 #if 0
-        /* for decode, move the surface into |TT */
-        if ((encode == 0) && /* decode */
-            ((psb_surface->buf.pl_flags & DRM_PSB_FLAG_MEM_RAR) == 0)) /* surface not in RAR */
-            psb_buffer_setstatus(&obj_surface->psb_surface->buf,
-                                 WSBM_PL_FLAG_TT | WSBM_PL_FLAG_SHARED, DRM_PSB_FLAG_MEM_MMU);
+            /* for decode, move the surface into |TT */
+            if ((encode == 0) && /* decode */
+                    ((psb_surface->buf.pl_flags & DRM_PSB_FLAG_MEM_RAR) == 0)) /* surface not in RAR */
+                psb_buffer_setstatus(&obj_surface->psb_surface->buf,
+                        WSBM_PL_FLAG_TT | WSBM_PL_FLAG_SHARED, DRM_PSB_FLAG_MEM_MMU);
 #endif
+        }
     }
 
     obj_context->va_flags = flag;
@@ -1207,7 +1213,8 @@ VAStatus psb_CreateContext(
         obj_context->config_id = -1;
         obj_context->picture_width = 0;
         obj_context->picture_height = 0;
-        free(obj_context->render_targets);
+        if (NULL != obj_context->render_targets)
+            free(obj_context->render_targets);
         free(obj_context->buffer_list);
         obj_context->num_buffers = 0;
         obj_context->render_targets = NULL;
@@ -1385,7 +1392,8 @@ VAStatus psb_CreateContext(
         obj_context->config_id = -1;
         obj_context->picture_width = 0;
         obj_context->picture_height = 0;
-        free(obj_context->render_targets);
+        if (NULL != obj_context->render_targets)
+            free(obj_context->render_targets);
         free(obj_context->buffer_list);
         obj_context->num_buffers = 0;
         obj_context->render_targets = NULL;
@@ -2102,13 +2110,15 @@ VAStatus psb_BeginPicture(
     if (obj_context->interlaced_stream || driver_data->disable_msvdx_rotate) {
         int i;
         obj_context->msvdx_rotate = 0;
-        for (i = 0; i < obj_context->num_render_targets; i++) {
-            object_surface_p obj_surface = SURFACE(obj_context->render_targets[i]);
-            /*we invalidate all surfaces's rotate buffer share info here.*/
-            if (obj_surface && obj_surface->share_info) {
-                obj_surface->share_info->surface_rotate = 0;
+        if (obj_context->num_render_targets > 0) {
+            for (i = 0; i < obj_context->num_render_targets; i++) {
+                object_surface_p obj_surface = SURFACE(obj_context->render_targets[i]);
+                /*we invalidate all surfaces's rotate buffer share info here.*/
+                if (obj_surface && obj_surface->share_info) {
+                    obj_surface->share_info->surface_rotate = 0;
+                }
             }
-	}
+        }
     }
     else
         obj_context->msvdx_rotate = driver_data->msvdx_rotate_want;
