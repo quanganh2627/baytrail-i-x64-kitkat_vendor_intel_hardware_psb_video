@@ -29,9 +29,14 @@
 #define _PSB_MDS_H_
 
 #ifdef TARGET_HAS_MULTIPLE_DISPLAY
+#ifdef USE_MDS_LEGACY
+#include <display/MultiDisplayClient.h>
+#else
 #include <display/MultiDisplayService.h>
-#ifdef PSBVIDEO_MRFL_VPP
-#include <VPPSetting.h>
+//#ifdef PSBVIDEO_MRFL_VPP
+//#include <VPPSetting.h>
+//#endif
+
 #endif
 #endif
 
@@ -44,12 +49,19 @@ enum {
 #endif
 
 namespace android {
+#ifndef USE_MDS_LEGACY
 namespace intel {
+#endif
 
+#ifndef USE_MDS_LEGACY
 class psbMultiDisplayListener {
 private:
+#ifndef USE_MDS_LEGACY
     sp<IMDService>  mMds;
     sp<IMultiDisplayInfoProvider> mListener;
+#else
+    MultiDisplayClient* mListener;
+#endif
 public:
     psbMultiDisplayListener();
     ~psbMultiDisplayListener();
@@ -67,6 +79,8 @@ public:
 };
 
 }; // namespace android
+#ifndef USE_MDS_LEGACY
 }; // namespace intel
+#endif
 
 #endif

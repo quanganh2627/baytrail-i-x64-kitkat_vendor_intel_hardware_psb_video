@@ -33,9 +33,12 @@
 #include "psb_mds.h"
 
 namespace android {
+#ifndef USE_MDS_LEGACY
 namespace intel {
+#endif
 
 psbMultiDisplayListener::psbMultiDisplayListener() {
+#ifndef USE_MDS_LEGACY
     // get mds service and register listener
     sp<IServiceManager> sm = defaultServiceManager();
     if (sm == NULL) {
@@ -48,24 +51,46 @@ psbMultiDisplayListener::psbMultiDisplayListener() {
         return;
     }
     mListener = mMds->getInfoProvider();
+#else
+    mListener = new MultiDisplayClient();
+    if (mListener == NULL)
+        return;
+#endif
     return;
 }
 
 psbMultiDisplayListener::~psbMultiDisplayListener() {
+#ifdef USE_MDS_LEGACY
+    if (mListener != NULL)
+        delete mListener;
+#endif
     mListener = NULL;
     return;
 }
 
 int psbMultiDisplayListener::getMode() {
     int mode = MDS_MODE_NONE;
+    if (mListener == NULL) return MDS_MODE_NONE;
+#ifndef USE_MDS_LEGACY
     if (mListener.get() == NULL) return MDS_INIT_VALUE;
+#endif
     mode = mListener->getDisplayMode(false);
+
+#ifndef USE_MDS_LEGACY
     if (checkMode(mode, (MDS_VIDEO_ON | MDS_HDMI_CONNECTED)))
         mode = MDS_HDMI_VIDEO_ISPLAYING;
     else if (checkMode(mode, (MDS_VIDEO_ON | MDS_WIDI_ON)))
         mode = MDS_WIDI_VIDEO_ISPLAYING;
     else
         mode = MDS_INIT_VALUE;
+#else
+    if (checkMode(mode, MDS_HDMI_VIDEO_EXT))
+        mode = MDS_HDMI_VIDEO_ISPLAYING;
+    else if (checkMode(mode,MDS_WIDI_ON))
+        mode = MDS_WIDI_VIDEO_ISPLAYING;
+    else
+        mode = MDS_INIT_VALUE;
+#endif
     //ALOGV("mds mode is %d", mode);
     return mode;
 }
@@ -74,6 +99,7 @@ bool psbMultiDisplayListener::getDecoderOutputResolution(
         int32_t* width, int32_t* height,
         int32_t* offX, int32_t* offY,
         int32_t* bufW, int32_t* bufH) {
+#ifndef USE_MDS_LEGACY
     if (mListener.get() == NULL ||
             width == NULL || height == NULL ||
             offX == NULL || offY == NULL ||
@@ -85,16 +111,26 @@ bool psbMultiDisplayListener::getDecoderOutputResolution(
     if (!checkMode(mode, (MDS_VIDEO_ON | MDS_WIDI_ON)))
         return false;
     status_t ret = mListener->getDecoderOutputResolution(0, width, height, offX, offY, bufW, bufH);
-    return (ret == NO_ERROR ? 1 : 0);
+    return (ret == NO_ERROR);
+#else
+    return false;
+#endif
 }
 
 bool psbMultiDisplayListener::getVppState() {
+    return false;
+#ifndef USE_MDS_LEGACY
     if (mListener.get() == NULL) {
         ALOGE("MDS listener is null");
         return false;
     }
     return mListener->getVppState();
+#else
+    return false;
+#endif
 }
 
 }; // namespace android
+#ifndef USE_MDS_LEGACY
 }; // namespace intel
+#endif
