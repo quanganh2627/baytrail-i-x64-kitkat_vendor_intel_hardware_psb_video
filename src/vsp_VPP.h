@@ -44,6 +44,7 @@ struct context_VPP_s {
 
 	struct psb_buffer_s *context_buf;
 	struct psb_buffer_s *intermediate_buf;
+	unsigned int intermediate_buf_size;
 
 	VABufferID *filters;
 	unsigned int num_filters;

@@ -45,6 +45,8 @@
 #define MB (KB * KB)
 #define VSP_CONTEXT_BUF_SIZE (60*KB)
 #define VSP_INTERMEDIATE_BUF_SIZE (29*MB)
+/* the size will be "out_bytes_per_frame * 9 + 34*1024" */
+#define VSP_INTERMEDIATE_SIZE(stride, height) ((stride) * (height) * 1.5 * 9 + 34 * 1024)
 
 #define MAX_VPP_PARAM (100)
 #define MIN_VPP_PARAM (0)
@@ -268,7 +270,7 @@ static VAStatus vsp_VPP_CreateContext(
 {
 	VAStatus vaStatus = VA_STATUS_SUCCESS;
 	context_VPP_p ctx;
-	int i;
+	int i, stride = 0;
 
 	/* Validate flag */
 	/* Validate picture dimensions */
@@ -328,10 +330,23 @@ static VAStatus vsp_VPP_CreateContext(
 		DEBUG_FAILURE;
 		goto out;
 	}
-	vaStatus = psb_buffer_create(obj_context->driver_data, VSP_INTERMEDIATE_BUF_SIZE, psb_bt_vpu_only, ctx->intermediate_buf);
+
+	/* get the stride */
+	if (obj_context->picture_width < 512)
+		stride = 512;
+	else if (obj_context->picture_width < 1024)
+		stride = 1024;
+	else if (obj_context->picture_width < 2048)
+		stride = 2048;
+	ctx->intermediate_buf_size = VSP_INTERMEDIATE_SIZE(stride, obj_context->picture_height);
+	vaStatus = psb_buffer_create(obj_context->driver_data, ctx->intermediate_buf_size, psb_bt_vpu_only, ctx->intermediate_buf);
 	if (VA_STATUS_SUCCESS != vaStatus) {
 		goto out;
 	}
+	drv_debug_msg(VIDEO_DEBUG_GENERAL, "%s: picture_width=%d, picture_height=%d, stride=%d,intermediate_buf_size=%fM\n",
+			__func__, obj_context->picture_width, obj_context->picture_height,stride,
+			ctx->intermediate_buf_size/(float)(1024*1024));
+
 
 	obj_context->format_data = (void*) ctx;
 	ctx->obj_context = obj_context;
@@ -376,6 +391,7 @@ static void vsp_VPP_DestroyContext(
 
 		free(ctx->intermediate_buf);
 		ctx->intermediate_buf = NULL;
+		ctx->intermediate_buf_size = 0;
 	}
 
 	if (ctx->filters) {
@@ -1316,7 +1332,7 @@ static VAStatus vsp_set_pipeline(context_VPP_p ctx)
 	psb_driver_data_p driver_data = ctx->obj_context->driver_data;
 
 	/* set intermediate buffer */
-	cell_pipeline_param->intermediate_buffer_size = VSP_INTERMEDIATE_BUF_SIZE;
+	cell_pipeline_param->intermediate_buffer_size = ctx->intermediate_buf_size;
 	cell_pipeline_param->intermediate_buffer_base = wsbmBOOffsetHint(ctx->intermediate_buf->drm_buf);
 
 	/* init pipeline cmd */
