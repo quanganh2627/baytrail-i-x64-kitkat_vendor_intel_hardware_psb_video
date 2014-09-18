@@ -33,9 +33,7 @@
 #include "psb_mds.h"
 
 namespace android {
-#ifndef USE_MDS_LEGACY
 namespace intel {
-#endif
 
 psbMultiDisplayListener::psbMultiDisplayListener() {
 #ifndef USE_MDS_LEGACY
@@ -130,7 +128,5 @@ bool psbMultiDisplayListener::getVppState() {
 #endif
 }
 
-}; // namespace android
-#ifndef USE_MDS_LEGACY
 }; // namespace intel
-#endif
+}; // namespace android

@@ -49,11 +49,11 @@ enum {
 #endif
 
 namespace android {
-#ifndef USE_MDS_LEGACY
 namespace intel {
-#endif
 
-#ifndef USE_MDS_LEGACY
+#ifdef USE_MDS_LEGACY
+class MultiDisplayClient;
+#endif
 class psbMultiDisplayListener {
 private:
 #ifndef USE_MDS_LEGACY
@@ -78,9 +78,7 @@ public:
     bool getVppState();
 };
 
-}; // namespace android
-#ifndef USE_MDS_LEGACY
 }; // namespace intel
-#endif
+}; // namespace android
 
 #endif
