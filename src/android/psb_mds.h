@@ -51,16 +51,13 @@ enum {
 namespace android {
 namespace intel {
 
-#ifdef USE_MDS_LEGACY
-class MultiDisplayClient;
-#endif
 class psbMultiDisplayListener {
 private:
 #ifndef USE_MDS_LEGACY
     sp<IMDService>  mMds;
     sp<IMultiDisplayInfoProvider> mListener;
 #else
-    MultiDisplayClient* mListener;
+    sp<MultiDisplayClient> mListener;
 #endif
 public:
     psbMultiDisplayListener();

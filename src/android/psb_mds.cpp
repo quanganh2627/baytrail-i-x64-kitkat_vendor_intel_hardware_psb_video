@@ -40,12 +40,12 @@ psbMultiDisplayListener::psbMultiDisplayListener() {
     // get mds service and register listener
     sp<IServiceManager> sm = defaultServiceManager();
     if (sm == NULL) {
-        LOGE("%s: Fail to get service manager", __func__);
+        ALOGE("%s: Fail to get service manager", __func__);
         return;
     }
     mMds = interface_cast<IMDService>(sm->getService(String16(INTEL_MDS_SERVICE_NAME)));
     if (mMds == NULL) {
-        LOGE("%s: Failed to get Mds service", __func__);
+        ALOGE("%s: Failed to get Mds service", __func__);
         return;
     }
     mListener = mMds->getInfoProvider();
@@ -58,22 +58,15 @@ psbMultiDisplayListener::psbMultiDisplayListener() {
 }
 
 psbMultiDisplayListener::~psbMultiDisplayListener() {
-#ifdef USE_MDS_LEGACY
-    if (mListener != NULL)
-        delete mListener;
-#endif
     mListener = NULL;
     return;
 }
 
 int psbMultiDisplayListener::getMode() {
-    int mode = MDS_MODE_NONE;
-    if (mListener == NULL) return MDS_MODE_NONE;
-#ifndef USE_MDS_LEGACY
-    if (mListener.get() == NULL) return MDS_INIT_VALUE;
-#endif
+    int mode = MDS_INIT_VALUE;
+    if (mListener == NULL || mListener.get() == NULL)
+        return mode;
     mode = mListener->getDisplayMode(false);
-
 #ifndef USE_MDS_LEGACY
     if (checkMode(mode, (MDS_VIDEO_ON | MDS_HDMI_CONNECTED)))
         mode = MDS_HDMI_VIDEO_ISPLAYING;
@@ -89,7 +82,7 @@ int psbMultiDisplayListener::getMode() {
     else
         mode = MDS_INIT_VALUE;
 #endif
-    //ALOGV("mds mode is %d", mode);
+    ALOGV("mds mode is %d", mode);
     return mode;
 }
 
