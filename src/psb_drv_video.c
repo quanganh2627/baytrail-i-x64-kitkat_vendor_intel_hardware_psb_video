@@ -2923,17 +2923,6 @@ static VAStatus psb__initDRI(VADriverContextP ctx)
         dri_state->fd = open("/dev/dri/card0", O_RDWR);
     assert(dri_state->fd >= 0);
 #endif
-
-#ifdef BAYTRAIL
-    if (drm_state->fd >= 0) {
-        drv_debug_msg(VIDEO_DEBUG_INIT, "Closing old FD for BYT.\n");
-        close(drm_state->fd);
-    }
-    drm_state->fd = open("/dev/dri/card1", O_RDWR);
-    drv_debug_msg(VIDEO_DEBUG_INIT, "Opening new FD for BYT: %d.\n", drm_state->fd);
-    assert(drm_state->fd >= 0);
-#endif
-
     assert(dri_state->driConnectedFlag == VA_DRI2 ||
            dri_state->driConnectedFlag == VA_DUMMY);
 
