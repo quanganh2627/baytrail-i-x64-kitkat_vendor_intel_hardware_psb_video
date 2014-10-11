@@ -1061,7 +1061,7 @@ VAStatus psb_CreateContext(
     drv_debug_msg(VIDEO_DEBUG_INIT, "CreateContext config_id:%d, pic_w:%d, pic_h:%d, flag:%d, num_render_targets:%d.\n",
         config_id, picture_width, picture_height, flag, num_render_targets);
 
-    //CHECK_INVALID_PARAM(num_render_targets <= 0);
+    CHECK_INVALID_PARAM(num_render_targets < 0);
 
     //CHECK_SURFACE(render_targets);
     CHECK_CONTEXT(context);
@@ -1157,7 +1157,7 @@ VAStatus psb_CreateContext(
     else
         cmdbuf_num = PSB_MAX_CMDBUFS;
     
-    if (num_render_targets > 0) {
+    if ((num_render_targets > 0) && (render_targets != NULL)) {
         for (i = 0; i < num_render_targets; i++) {
             object_surface_p obj_surface = SURFACE(render_targets[i]);
             psb_surface_p psb_surface;
