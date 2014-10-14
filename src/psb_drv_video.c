@@ -662,6 +662,40 @@ VAStatus psb_GetSurfaceAttributes(
 
 }
 
+#ifdef PSBVIDEO_MSVDX_DEC_TILING
+unsigned long psb__tile_stride_log2_256(int w)
+{
+    int stride_mode = 0;
+
+    if (512 >= w)
+        stride_mode = 1;
+    else if (1024 >= w)
+        stride_mode = 2;
+    else if (2048 >= w)
+        stride_mode = 3;
+    else if (4096 >= w)
+        stride_mode = 4;
+
+    return stride_mode;
+}
+
+unsigned long psb__tile_stride_log2_512(int w)
+{
+    int stride_mode = 0;
+
+    if (512 >= w)
+        stride_mode = 0;
+    else if (1024 >= w)
+        stride_mode = 1;
+    else if (2048 >= w)
+        stride_mode = 2;
+    else if (4096 >= w)
+        stride_mode = 3;
+
+    return stride_mode;
+}
+#endif
+
 VAStatus psb_CreateSurfaces(
         VADriverContextP ctx,
         int width,
@@ -696,7 +730,7 @@ VAStatus psb_CreateSurfaces2(
     unsigned int initalized_info_flag = 1;
     VASurfaceAttribExternalBuffers  *pExternalBufDesc = NULL;
     PsbSurfaceAttributeTPI attribute_tpi;
-	int pixel_format = -1;
+    int pixel_format = -1;
 
     CHECK_INVALID_PARAM(num_surfaces <= 0);
     CHECK_SURFACE(surface_list);
@@ -912,7 +946,8 @@ VAStatus psb_DestroySurfaces(
 )
 {
     INIT_DRIVER_DATA
-    int i;
+    int i, j;
+    object_context_p obj_context = NULL;
     VAStatus vaStatus = VA_STATUS_SUCCESS;
 
     if (num_surfaces <= 0) {
@@ -947,6 +982,17 @@ VAStatus psb_DestroySurfaces(
             /* Surface is being displaying. Need to stop overlay here */
             psb_coverlay_stop(ctx);
         }
+
+        obj_context = CONTEXT(obj_surface->context_id);
+        if (obj_context != NULL) {
+            for (j = 0; j < obj_context->num_render_targets; j++) {
+                if (obj_context->render_targets[j] == obj_surface->surface_id) {
+                    obj_context->render_targets[j] = VA_INVALID_SURFACE;
+                    break;
+                }
+            }
+        }
+
         drv_debug_msg(VIDEO_DEBUG_INIT, "%s : obj_surface->surface_id = 0x%x\n",__FUNCTION__, obj_surface->surface_id);
         if (obj_surface->share_info) {
             psb_DestroySurfaceGralloc(obj_surface);
@@ -1006,40 +1052,6 @@ int psb_rm_context(psb_driver_data_p driver_data)
 
     return ret;
 }
-
-#ifdef PSBVIDEO_MSVDX_DEC_TILING
-unsigned long psb__tile_stride_log2_256(int w)
-{
-    int stride_mode = 0;
-
-    if (512 >= w)
-        stride_mode = 1;
-    else if (1024 >= w)
-        stride_mode = 2;
-    else if (2048 >= w)
-        stride_mode = 3;
-    else if (4096 >= w)
-        stride_mode = 4;
-
-    return stride_mode;
-}
-
-unsigned long psb__tile_stride_log2_512(int w)
-{
-    int stride_mode = 0;
-
-    if (512 >= w)
-        stride_mode = 0;
-    else if (1024 >= w)
-        stride_mode = 1;
-    else if (2048 >= w)
-        stride_mode = 2;
-    else if (4096 >= w)
-        stride_mode = 3;
-
-    return stride_mode;
-}
-#endif
 
 VAStatus psb_CreateContext(
     VADriverContextP ctx,
@@ -1196,6 +1208,11 @@ VAStatus psb_CreateContext(
                 psb_buffer_setstatus(&obj_surface->psb_surface->buf,
                         WSBM_PL_FLAG_TT | WSBM_PL_FLAG_SHARED, DRM_PSB_FLAG_MEM_MMU);
 #endif
+        }
+    }
+    else if (num_render_targets > 0) {
+        for (i = 0; i < num_render_targets; i++) {
+            obj_context->render_targets[i] = VA_INVALID_SURFACE;
         }
     }
 
@@ -2066,6 +2083,7 @@ VAStatus psb_BeginPicture(
     object_context_p obj_context;
     object_surface_p obj_surface;
     object_config_p obj_config;
+    unsigned int i = 0, j = VA_INVALID_ID;
 
     obj_context = CONTEXT(context);
     CHECK_CONTEXT(obj_context);
@@ -2083,6 +2101,41 @@ VAStatus psb_BeginPicture(
     obj_config = CONFIG(obj_context->config_id);
     if (obj_config == NULL)
         return VA_STATUS_ERROR_INVALID_CONFIG;
+
+    for (i = 0; i < obj_context->num_render_targets; i++) {
+        if (obj_context->render_targets[i] == obj_surface->surface_id) {
+            break;
+        }
+        else if (SURFACE(obj_context->render_targets[i]) == NULL) {
+            j = (i < j) ? i : j;
+        }
+    }
+
+    if (i >= obj_context->num_render_targets) {
+        if (j < obj_context->num_render_targets) {
+            obj_context->render_targets[j] = obj_surface->surface_id;
+            obj_surface->context_id = obj_context->context_id;
+
+#ifdef PSBVIDEO_MSVDX_DEC_TILING
+            if (GET_SURFACE_INFO_tiling(obj_surface->psb_surface))
+#ifdef BAYTRAIL
+                obj_context->msvdx_tile = psb__tile_stride_log2_512(obj_surface->width);
+#else
+                if ( (obj_config != NULL) &&
+                    (obj_config->entrypoint == VAEntrypointVideoProc) &&
+                    (obj_config->profile == VAProfileNone))
+                    obj_context->msvdx_tile = psb__tile_stride_log2_256(obj_context->picture_width);
+                else
+                    obj_context->msvdx_tile = psb__tile_stride_log2_256(obj_surface->width);
+#endif
+                obj_context->msvdx_tile &= 0xf; /* clear rotate tile */
+                obj_context->msvdx_tile |= (obj_context->msvdx_tile << 4);
+                obj_context->ctp_type &= (~PSB_CTX_TILING_MASK); /* clear tile context */
+                obj_context->ctp_type |= ((obj_context->msvdx_tile & 0xff) << 16);
+                psb_update_context(driver_data, obj_context->ctp_type | driver_data->protected);
+#endif
+        }
+    }
 
     /* if the surface is decode render target, and in displaying */
     if (obj_config &&
