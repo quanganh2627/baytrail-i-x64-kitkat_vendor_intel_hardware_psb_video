@@ -42,6 +42,8 @@
 #define SURFACE(id)    ((object_surface_p) object_heap_lookup( &driver_data->surface_heap, id ))
 #define BUFFER(id)  ((object_buffer_p) object_heap_lookup( &driver_data->buffer_heap, id ))
 
+static pthread_mutex_t gralloc_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 /*FIXME: include hal_public.h instead of define it here*/
 enum {
     GRALLOC_SUB_BUFFER0 = 0,
@@ -60,6 +62,7 @@ VAStatus psb_DestroySurfaceGralloc(object_surface_p obj_surface)
     usage |= GRALLOC_USAGE_SW_WRITE_OFTEN;
 #endif
 
+    pthread_mutex_lock(&gralloc_mutex);
     if (!gralloc_lock(handle, usage, 0, 0,
                       obj_surface->width, obj_surface->height, (void **)&vaddr[GRALLOC_SUB_BUFFER0])){
         if (obj_surface->share_info && vaddr[GRALLOC_SUB_BUFFER1] == obj_surface->share_info) {
@@ -77,6 +80,7 @@ VAStatus psb_DestroySurfaceGralloc(object_surface_p obj_surface)
         }
         gralloc_unlock(handle);
     }
+    pthread_mutex_unlock(&gralloc_mutex);
 
     return VA_STATUS_SUCCESS;
 }
@@ -188,6 +192,7 @@ VAStatus psb_CreateSurfacesFromGralloc(
         usage |= GRALLOC_USAGE_HW_VIDEO_ENCODER;
 
         handle = (unsigned long)external_buffers->buffers[i];
+        pthread_mutex_lock(&gralloc_mutex);
         if (gralloc_lock(handle, usage, 0, 0, width, height, (void **)&vaddr)) {
             vaStatus = VA_STATUS_ERROR_UNKNOWN;
         } else {
@@ -201,6 +206,7 @@ VAStatus psb_CreateSurfacesFromGralloc(
             obj_surface->share_info = NULL;
             gralloc_unlock(handle);
         }
+        pthread_mutex_unlock(&gralloc_mutex);
 
         if (VA_STATUS_SUCCESS != vaStatus) {
             free(psb_surface);
@@ -355,6 +361,7 @@ VAStatus psb_CreateSurfacesFromGralloc(
         }
 
         handle = (unsigned long)external_buffers->buffers[i];
+        pthread_mutex_lock(&gralloc_mutex);
         if (gralloc_lock(handle, usage, 0, 0, width, height, (void **)&vaddr[GRALLOC_SUB_BUFFER0])) {
             vaStatus = VA_STATUS_ERROR_UNKNOWN;
         } else {
@@ -438,6 +445,7 @@ VAStatus psb_CreateSurfacesFromGralloc(
             gralloc_unlock(handle);
             psb_surface->buf.user_ptr = NULL;
         }
+        pthread_mutex_unlock(&gralloc_mutex);
                 
         if (VA_STATUS_SUCCESS != vaStatus) {
             free(psb_surface);
