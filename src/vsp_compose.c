@@ -201,10 +201,10 @@ VAStatus vsp_compose_process_pipeline_param(context_VPP_p ctx, object_context_p 
 
 	/* Blending related params */
 	/* check which plane is bigger */
-	if (rgb_width * rgb_height > op_h * op_w)
-	cell_compose_param->Is_video_the_back_ground = 0;
+	if (rgb_width * rgb_height > ip_h * ip_w)
+		cell_compose_param->Is_video_the_back_ground = 0;
 	else
-	cell_compose_param->Is_video_the_back_ground = 1;
+		cell_compose_param->Is_video_the_back_ground = 1;
 
 	cell_compose_param->ROI_scaling_ip_width = ip_w;
 	cell_compose_param->ROI_scaling_ip_height = ip_h;
