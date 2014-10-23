@@ -69,6 +69,12 @@
 #include "hwdefs/dxva_fw_flags.h"
 #include <wsbm/wsbm_pool.h>
 
+#ifdef __GNUC__
+# define __maybe_unused __attribute__((__unused__))
+#else
+# define __maybe_unused
+#endif
+
 #ifndef min
 #define min(a, b) ((a) < (b)) ? (a) : (b)
 #endif

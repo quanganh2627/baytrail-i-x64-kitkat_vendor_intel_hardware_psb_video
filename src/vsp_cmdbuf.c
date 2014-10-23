@@ -34,6 +34,13 @@
 #define LLDMA_SIZE            (0x2000)
 #define RELOC_SIZE            (0x3000)
 
+static int
+vspDRMCmdBuf(int fd, int ioctl_offset, psb_buffer_p *buffer_list, int buffer_count, unsigned cmdBufHandle,
+             unsigned cmdBufOffset, unsigned cmdBufSize,
+             unsigned relocBufHandle, unsigned relocBufOffset,
+             unsigned numRelocs, int damage,
+             unsigned engine, unsigned fence_flags, struct psb_ttm_fence_rep *fence_rep);
+
 /*
  * Create command buffer
  */
@@ -284,7 +291,7 @@ static int
 vspDRMCmdBuf(int fd, int ioctl_offset, psb_buffer_p *buffer_list, int buffer_count, unsigned cmdBufHandle,
              unsigned cmdBufOffset, unsigned cmdBufSize,
              unsigned relocBufHandle, unsigned relocBufOffset,
-             unsigned numRelocs, int damage,
+             unsigned numRelocs, int __maybe_unused damage,
              unsigned engine, unsigned fence_flags, struct psb_ttm_fence_rep *fence_rep)
 {
 	drm_psb_cmdbuf_arg_t ca;
@@ -382,7 +389,7 @@ out:
  *
  * Returns 0 on success
  */
-int vsp_context_submit_cmdbuf(object_context_p obj_context)
+int vsp_context_submit_cmdbuf(object_context_p __maybe_unused obj_context)
 {
 
 	return 0;

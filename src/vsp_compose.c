@@ -45,7 +45,7 @@
 #define ALIGN_TO_128(value) ((value + 128 - 1) & ~(128 - 1))
 #define ALIGN_TO_16(value) ((value + 16 - 1) & ~(16 - 1))
 
-VAStatus vsp_compose_process_pipeline_param(context_VPP_p ctx, object_context_p obj_context, object_buffer_p obj_buffer)
+VAStatus vsp_compose_process_pipeline_param(context_VPP_p ctx, object_context_p __maybe_unused obj_context, object_buffer_p obj_buffer)
 {
 
 	VAStatus vaStatus = VA_STATUS_SUCCESS;
