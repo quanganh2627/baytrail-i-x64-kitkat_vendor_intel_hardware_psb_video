@@ -253,6 +253,17 @@ static VAStatus tng__yuv_processor_execute(context_DEC_p dec_ctx, object_buffer_
 
         ctx->src_surface = obj_surface->psb_surface;
         dec_ctx->obj_context->msvdx_rotate = vpp_params->rotation_state;
+
+        if(!vpp_params->rotation_state && vpp_params->output_region) {
+            dec_ctx->obj_context->msvdx_scaling = 1;
+            dec_ctx->obj_context->driver_data->render_rect.width = vpp_params->surface_region->width;
+            dec_ctx->obj_context->driver_data->render_rect.height = vpp_params->surface_region->height;
+            dec_ctx->obj_context->current_render_target->width_s = vpp_params->output_region->width;
+            dec_ctx->obj_context->current_render_target->height_s = vpp_params->output_region->height;
+            dec_ctx->obj_context->scaling_update = 1;
+            drv_debug_msg(VIDEO_DEBUG_GENERAL, "scaling output resolution:%dx%d\n",\
+                    vpp_params->output_region->width,vpp_params->output_region->height);
+        }
         SET_SURFACE_INFO_rotate(rotate_surface, dec_ctx->obj_context->msvdx_rotate);
 
         ctx->proc_param = vpp_params;
@@ -261,7 +272,7 @@ static VAStatus tng__yuv_processor_execute(context_DEC_p dec_ctx, object_buffer_
 
 #ifdef PSBVIDEO_MSVDX_DEC_TILING
         object_context_p obj_context = dec_ctx->obj_context;
-	psb_driver_data_p driver_data = obj_context->driver_data;
+        psb_driver_data_p driver_data = obj_context->driver_data;
         drv_debug_msg(VIDEO_DEBUG_GENERAL, "attempt to update tile context\n");
         if (GET_SURFACE_INFO_tiling(ctx->src_surface)) {
             drv_debug_msg(VIDEO_DEBUG_GENERAL, "update tile context\n");

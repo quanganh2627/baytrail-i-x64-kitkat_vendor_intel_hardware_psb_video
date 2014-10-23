@@ -77,19 +77,27 @@ void vld_dec_setup_alternative_frame(object_context_p obj_context)
     context_DEC_p ctx = (context_DEC_p) obj_context->format_data;
     psb_surface_p src_surface = obj_context->current_render_target->psb_surface;
     psb_surface_p out_loop_surface = obj_context->current_render_target->out_loop_surface;
-    int ved_scaling = (CONTEXT_SCALING(obj_context) && !ctx->yuv_ctx);
+    int ved_scaling;
     uint32_t startX = 0, startY = 0, luma_addr_offset = 0, chroma_addr_offset = 0;
 
-    /*  In VPP ctx, current_render_target is rotated surface */
+    if (VAEntrypointVideoProc == obj_context->entry_point)
+        ved_scaling = CONTEXT_SCALING(obj_context);
+    else
+        /* VAEntrypointVLD case, scaling happens at first pass, second pass for rotation */
+        ved_scaling = (CONTEXT_SCALING(obj_context) && !ctx->yuv_ctx);
+
+    drv_debug_msg(VIDEO_DEBUG_GENERAL, "entrypoint is %d, ved_scaling is %d, ved_rotating is %d", obj_context->entry_point, ved_scaling, obj_context->msvdx_rotate);
+
+    /*  In VPP ctx, current_render_target is dest rotated/scaled surface */
     if (ctx->yuv_ctx && (VAEntrypointVideoProc == obj_context->entry_point)) {
-        drv_debug_msg(VIDEO_DEBUG_GENERAL, "Setup second-pass rotation\n");
+        drv_debug_msg(VIDEO_DEBUG_GENERAL, "Setup second-pass rotation or scaling\n");
         out_loop_surface = src_surface;
         src_surface = ctx->yuv_ctx->src_surface;
-    }
+    } else if (ved_scaling) /* first pass scaling */
+        out_loop_surface = obj_context->current_render_target->scaling_surface;
 
     if (CONTEXT_ALTERNATIVE_OUTPUT(obj_context) || obj_context->entry_point == VAEntrypointVideoProc) {
         if (ved_scaling) {
-            out_loop_surface = obj_context->current_render_target->scaling_surface;
 #ifndef BAYTRAIL
             tng_ved_write_scale_reg(obj_context);
 
