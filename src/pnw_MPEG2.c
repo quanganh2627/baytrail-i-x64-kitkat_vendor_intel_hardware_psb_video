@@ -1010,6 +1010,15 @@ static void psb__MPEG2_set_picture_header(context_MPEG2_p ctx, VASliceParameterB
 
     psb_cmdbuf_reg_set(cmdbuf, REGISTER_OFFSET(MSVDX_VEC_MPEG2, CR_VEC_MPEG2_FE_SLICE) , FE_slice);
 
+    FE_slice = 0;
+    REGIO_WRITE_FIELD_LITE(FE_slice,
+                      MSVDX_VEC_MPEG2,
+                      CR_VEC_MPEG2_FE_SPS0,
+                      FE_HORIZONTAL_SIZE_MINUS1,
+                      ctx->picture_width_mb - 1);
+
+    psb_cmdbuf_reg_set(cmdbuf, REGISTER_OFFSET(MSVDX_VEC_MPEG2, CR_VEC_MPEG2_FE_SPS0) , FE_slice);
+
     psb_cmdbuf_reg_end_block(cmdbuf);
 
 
@@ -1176,8 +1185,10 @@ static void psb__MPEG2_begin_slice(context_DEC_p dec_ctx, VASliceParameterBuffer
     VASliceParameterBufferMPEG2 *slice_param = (VASliceParameterBufferMPEG2 *) vld_slice_param;
     context_MPEG2_p ctx = (context_MPEG2_p)dec_ctx;
 
+    psb__MPEG2_write_VLC_tables(ctx);
+
     dec_ctx->bits_offset = slice_param->macroblock_offset;
-    /* dec_ctx->SR_flags = 0; */
+    dec_ctx->SR_flags = CMD_SR_VERIFY_STARTCODE;
 }
 static void psb__MPEG2_process_slice_data(context_DEC_p dec_ctx, VASliceParameterBufferBase *vld_slice_param)
 {
