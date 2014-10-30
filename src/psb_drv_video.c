@@ -2183,7 +2183,7 @@ VAStatus psb_BeginPicture(
 
     SET_SURFACE_INFO_rotate(obj_surface->psb_surface, obj_context->msvdx_rotate);
 
-     if (CONTEXT_SCALING(obj_context) && obj_config->entrypoint != VAEntrypointEncSlice)
+     if (CONTEXT_SCALING(obj_context) && obj_config->entrypoint == VAEntrypointVLD)
           if(VA_STATUS_SUCCESS != psb_CreateScalingSurface(obj_context, obj_surface)) {
              obj_context->msvdx_scaling = 0;
              ALOGW("%s: not allocate scaling surface", __func__);
