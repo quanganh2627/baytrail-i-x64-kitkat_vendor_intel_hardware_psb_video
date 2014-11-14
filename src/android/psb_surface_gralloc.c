@@ -380,7 +380,7 @@ VAStatus psb_CreateSurfacesFromGralloc(
 		(format != VA_RT_FORMAT_RGB32)) {
 
                 unsigned int init_share_info = (unsigned int)external_buffers->reserved[2];
-                drv_debug_msg(VIDEO_DEBUG_ERROR, "%s : Create graphic buffer initialized share info %d",__FUNCTION__, init_share_info);
+                drv_debug_msg(VIDEO_DEBUG_GENERAL, "%s : Create graphic buffer initialized share info %d",__FUNCTION__, init_share_info);
                 obj_surface->share_info = (psb_surface_share_info_t *)vaddr[GRALLOC_SUB_BUFFER1];
 
                 if (init_share_info) {
@@ -458,6 +458,8 @@ VAStatus psb_CreateSurfacesFromGralloc(
         buffer_stride = psb_surface->stride;
         /* by default, surface fourcc is NV12 */
         psb_surface->extra_info[4] = fourcc;
+        /* save the pixel format set by application */
+        psb_surface->extra_info[8] = external_buffers->pixel_format;
 #ifdef PSBVIDEO_MSVDX_DEC_TILING
         psb_surface->extra_info[7] = external_buffers->tiling;
 #endif
