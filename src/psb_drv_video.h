@@ -553,6 +553,7 @@ struct psb_surface_share_info_s {
 
     unsigned int csc_mode;
     unsigned int video_range;
+    unsigned int initialized;
 };
 
 struct object_surface_s {
