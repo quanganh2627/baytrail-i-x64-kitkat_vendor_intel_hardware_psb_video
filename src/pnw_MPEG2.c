@@ -1385,6 +1385,8 @@ static VAStatus pnw_MPEG2_EndPicture(
             psb__MPEG2_insert_blit_cmd_to_rotate(ctx);
     }
 
+    ctx->obj_context->flags = FW_VA_RENDER_IS_LAST_SLICE;
+
     if (psb_context_flush_cmdbuf(ctx->obj_context)) {
         vaStatus = VA_STATUS_ERROR_UNKNOWN;
     }
