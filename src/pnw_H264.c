@@ -203,8 +203,8 @@ typedef struct context_H264_s *context_H264_p;
 
 #define SURFACE(id)    ((object_surface_p) object_heap_lookup( &ctx->obj_context->driver_data->surface_heap, id ))
 
-#define CACHE_REF_OFFSET        144
-#define CACHE_ROW_OFFSET        8
+#define CACHE_REF_OFFSET        72
+#define CACHE_ROW_OFFSET        4
 
 #define REFERENCE_CACHE_SIZE    (512 * 1024)
 
