@@ -2130,7 +2130,6 @@ VAStatus psb_BeginPicture(
                     obj_context->msvdx_tile = psb__tile_stride_log2_256(obj_surface->width);
 #endif
                 obj_context->msvdx_tile &= 0xf; /* clear rotate tile */
-                obj_context->msvdx_tile |= (obj_context->msvdx_tile << 4);
                 obj_context->ctp_type &= (~PSB_CTX_TILING_MASK); /* clear tile context */
                 obj_context->ctp_type |= ((obj_context->msvdx_tile & 0xff) << 16);
                 psb_update_context(driver_data, obj_context->ctp_type | driver_data->protected);
