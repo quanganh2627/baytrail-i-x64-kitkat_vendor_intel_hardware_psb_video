@@ -340,12 +340,12 @@ void psb_RecalcAlternativeOutput(object_context_p obj_context)
              scaling_buffer_height = 0;
         }
     } else {
-        obj_context->msvdx_scaling = 0;
-
         //VED only support downscaling only.
-        if ((obj_context->picture_width > scaling_width) &&
-            (((obj_context->picture_height + 0x1f) & ~0x1f) > ((scaling_height + 0x1f) & ~0x1f)))
-                obj_context->msvdx_scaling = 1;
+        obj_context->msvdx_scaling = 1;
+
+        if ((obj_context->picture_width < scaling_width) &&
+            (((obj_context->picture_height + 0x1f) & ~0x1f) < ((scaling_height + 0x1f) & ~0x1f)))
+                obj_context->msvdx_scaling = 0;
     }
 
         obj_context->scaling_width = scaling_width;
