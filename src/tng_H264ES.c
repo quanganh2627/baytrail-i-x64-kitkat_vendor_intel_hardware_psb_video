@@ -70,8 +70,12 @@ static VAStatus tng__H264ES_init_profile(
     context_ENC_p ctx;
     ctx = (context_ENC_p) obj_context->format_data;
     switch (obj_config->profile) {
-        case VAProfileH264Baseline:
         case VAProfileH264ConstrainedBaseline:
+            ctx->sCsfParams.constraint_set1_flag = 1;
+            ctx->ui8ProfileIdc = H264ES_PROFILE_BASELINE;
+            break;
+        case VAProfileH264Baseline:
+            ctx->sCsfParams.constraint_set1_flag = 0;
             ctx->ui8ProfileIdc = H264ES_PROFILE_BASELINE;
             break;
         case VAProfileH264Main:

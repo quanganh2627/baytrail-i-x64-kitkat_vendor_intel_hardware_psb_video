@@ -2129,6 +2129,7 @@ static void tng__H264ES_send_seq_header(context_ENC_p ctx, IMG_UINT32 ui32Stream
         ps_mem->bufs_seq_header.virtual_addr,
         &(ctx->sVuiParams),
         &(ctx->sCropParams),
+        &(ctx->sCsfParams),
         ctx->ui16Width,         //ui8_picture_width_in_mbs
         ctx->ui16PictureHeight, //ui8_picture_height_in_mbs
         ctx->ui32CustomQuantMask,    //0,  ui8_custom_quant_mask

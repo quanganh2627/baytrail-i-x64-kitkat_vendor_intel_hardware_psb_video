@@ -235,6 +235,15 @@ typedef struct {
     IMG_UINT32      ui32ListMask;
 } H264_SCALING_MATRIX_PARAMS;
 
+typedef struct {
+    IMG_UINT8 constraint_set0_flag;
+    IMG_UINT8 constraint_set1_flag;
+    IMG_UINT8 constraint_set2_flag;
+    IMG_UINT8 constraint_set3_flag;
+    IMG_UINT8 constraint_set4_flag;
+    IMG_UINT8 constraint_set5_flag;
+} H264_CONSTRAINT_SET_FLAG;
+
 typedef struct _H264_SEQUENCE_HEADER_PARAMS_STRUC {
     SH_PROFILE_TYPE ucProfile;
     SH_LEVEL_TYPE ucLevel;
@@ -249,6 +258,7 @@ typedef struct _H264_SEQUENCE_HEADER_PARAMS_STRUC {
     IMG_BOOL    bUseDefaultScalingList;
     IMG_BOOL    bIsLossless;
     H264_VUI_PARAMS VUI_Params;
+    H264_CONSTRAINT_SET_FLAG CSF_Params;
 } H264_SEQUENCE_HEADER_PARAMS;
 
 typedef struct {
@@ -356,6 +366,7 @@ void tng__H264ES_prepare_sequence_header(
     void *pHeaderMemory,
     H264_VUI_PARAMS *psVUI_Params,
     H264_CROP_PARAMS *psCropParams,
+    H264_CONSTRAINT_SET_FLAG *psCsfParams,
     IMG_UINT16 ui16PictureWidth,
     IMG_UINT16 ui16PictureHeight,
     IMG_UINT32 ui32CustomQuantMask,

@@ -256,6 +256,7 @@ struct context_ENC_s {
     IMG_ENCODE_FEATURES sEncFeatures;
     H264_CROP_PARAMS sCropParams;
     H264_VUI_PARAMS sVuiParams;
+    H264_CONSTRAINT_SET_FLAG sCsfParams;
     FRAME_ORDER_INFO sFrameOrderInfo;
     // Adaptive Intra Refresh Control structure
     ADAPTIVE_INTRA_REFRESH_INFO_TYPE sAirInfo;

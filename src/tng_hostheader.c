@@ -657,7 +657,7 @@ static void tng__H264ES_writebits_sequence_header(
             // Byte	aligned	(bit 48)
             tng__write_upto8bits_elements(pMTX_Header, aui32ElementPointers,
                 (1 << 7) |    // constraint_set0_flag = 1 for BP constraints
-                (0 << 6) |    // constraint_set1_flag = 0 for MP constraints
+                (((pSHParams->CSF_Params.constraint_set1_flag == 1) ? 1:0)  << 6) |    // constraint_set1_flag = 0 for MP constraints
                 (0 << 5) |    // constraint_set2_flag = 0 for EP constraints
                 ((pSHParams->ucLevel==SH_LEVEL_1B ? 1:0) << 4),  // constraint_set3_flag = 1 for level 1b, 0 for others
                 // reserved_zero_4bits = 0
@@ -2499,6 +2499,7 @@ void tng__H264ES_prepare_sequence_header(
     void *pHeaderMemory,
     H264_VUI_PARAMS *psVUI_Params,
     H264_CROP_PARAMS *psCropParams,
+    H264_CONSTRAINT_SET_FLAG *psCsfParams,
     IMG_UINT16 ui16PictureWidth,
     IMG_UINT16 ui16PictureHeight,
     IMG_UINT32 ui32CustomQuantMask,
@@ -2528,6 +2529,7 @@ void tng__H264ES_prepare_sequence_header(
 
     SHParams.ucProfile = ui8ProfileIdc - 5;
     SHParams.ucLevel = (ui8LevelIdc != 111) ? ui8LevelIdc : SH_LEVEL_1B;
+    SHParams.CSF_Params.constraint_set1_flag = psCsfParams->constraint_set1_flag;
     SHParams.ucWidth_in_mbs_minus1 = (IMG_UINT8)((ui16PictureWidth >> 4)- 1);
     SHParams.ucHeight_in_maps_units_minus1 = (IMG_UINT8)((ui16PictureHeight >> 4) - 1);
     SHParams.gaps_in_frame_num_value = IMG_FALSE;
