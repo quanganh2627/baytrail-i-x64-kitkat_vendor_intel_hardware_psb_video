@@ -427,6 +427,16 @@ VAStatus psb_CreateSurfacesFromGralloc(
                         obj_surface->share_info->video_range = 0;
                     }
 
+                    if (vaddr[GRALLOC_SUB_BUFFER0] == NULL) {
+                        drv_debug_msg(VIDEO_DEBUG_ERROR, "Failed to lock graphic buffer in psb_video");
+                    } else {
+                        if ((obj_surface->share_info->crop_width != obj_surface->share_info->width) || (obj_surface->share_info->crop_height != obj_surface->share_info->height)) {
+                            size = psb_surface->chroma_offset;
+                            memset(vaddr[GRALLOC_SUB_BUFFER0], 0, size);
+                            memset(vaddr[GRALLOC_SUB_BUFFER0] + size, 0x80, psb_surface->size - size);
+                        }
+                    }
+
                     obj_surface->share_info->surface_protected = driver_data->protected;
                     if (driver_data->render_rect.width == 0 || driver_data->render_rect.height == 0) {
                         obj_surface->share_info->crop_width = obj_surface->share_info->width;
